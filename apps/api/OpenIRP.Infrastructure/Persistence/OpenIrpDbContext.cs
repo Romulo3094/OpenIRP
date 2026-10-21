@@ -92,20 +92,7 @@ public sealed class OpenIrpDbContext : IdentityDbContext<ApplicationUser, Identi
             b.Property(x => x.OrganizationId).HasColumnName("organization_id");
             b.Property(x => x.UserId).HasColumnName("user_id");
             b.Property(x => x.Role).HasColumnName("role").HasMaxLength(20)
-                .HasConversion(v => v switch
-                    {
-                        OrganizationRole.OrgAdmin => "ORG_ADMIN",
-                        OrganizationRole.Analyst => "ANALYST",
-                        OrganizationRole.Viewer => "VIEWER",
-                        _ => throw new ArgumentOutOfRangeException(nameof(v))
-                    },
-                    v => v switch
-                    {
-                        "ORG_ADMIN" => OrganizationRole.OrgAdmin,
-                        "ANALYST" => OrganizationRole.Analyst,
-                        "VIEWER" => OrganizationRole.Viewer,
-                        _ => throw new ArgumentOutOfRangeException(nameof(v))
-                    });
+                .HasConversion(v => RoleToString(v), v => StringToRole(v));
             b.Property(x => x.Status).HasColumnName("status").HasMaxLength(20)
                 .HasConversion(v => v.ToString().ToUpperInvariant(),
                     v => Enum.Parse<MembershipStatus>(v, true))
@@ -123,6 +110,22 @@ public sealed class OpenIrpDbContext : IdentityDbContext<ApplicationUser, Identi
                 .OnDelete(DeleteBehavior.Restrict);
         });
     }
+
+    private static string RoleToString(OrganizationRole role) => role switch
+    {
+        OrganizationRole.OrgAdmin => "ORG_ADMIN",
+        OrganizationRole.Analyst => "ANALYST",
+        OrganizationRole.Viewer => "VIEWER",
+        _ => throw new ArgumentOutOfRangeException(nameof(role))
+    };
+
+    private static OrganizationRole StringToRole(string value) => value switch
+    {
+        "ORG_ADMIN" => OrganizationRole.OrgAdmin,
+        "ANALYST" => OrganizationRole.Analyst,
+        "VIEWER" => OrganizationRole.Viewer,
+        _ => throw new ArgumentOutOfRangeException(nameof(value))
+    };
 
     private static void ConfigurePlatformAdministrator(ModelBuilder builder)
     {
