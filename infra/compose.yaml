@@ -1,0 +1,53 @@
+name: openirp
+
+services:
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: openirp-ollama
+    restart: unless-stopped
+    gpus: all
+
+    ports:
+      - "127.0.0.1:11435:11434"
+
+    volumes:
+      - openirp_ollama_data:/root/.ollama
+
+    networks:
+      - openirp-network
+
+  postgres:
+    image: postgres:17
+    container_name: openirp-postgres
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    ports:
+      - "127.0.0.1:5433:5432"
+
+    volumes:
+      - openirp_pg_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    networks:
+      - openirp-network
+
+volumes:
+  openirp_ollama_data:
+    external: true
+
+  openirp_pg_data:
+
+networks:
+  openirp-network:
+    driver: bridge

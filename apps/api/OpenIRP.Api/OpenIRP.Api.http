@@ -1,0 +1,6 @@
+@OpenIRP.Api_HostAddress = http://localhost:5195
+
+GET {{OpenIRP.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
