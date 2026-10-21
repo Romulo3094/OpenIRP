@@ -80,7 +80,7 @@ Las siguientes capacidades forman parte de la propuesta de desarrollo. Su dispon
 
 ### Ejecución guiada
 
-- Presentación secuencial de las acciones recomendadas.
+- Ejecución flexible de tareas con dependencias explícitas entre pasos, sin exigir un orden estrictamente secuencial.
 - Identificación de responsables.
 - Registro del avance de los procedimientos.
 - Confirmación humana de las acciones realizadas.
@@ -108,7 +108,7 @@ La solución se concibe a partir de los siguientes componentes:
 5. **Servicio de IA local:** asistencia para adaptar y explicar procedimientos.
 6. **Validación humana:** revisión y aceptación de las recomendaciones antes de su utilización.
 
-La arquitectura técnica definitiva y las tecnologías específicas de implementación se documentarán conforme avance el desarrollo.
+La arquitectura técnica está especificada en [el documento maestro](OpenIRP_Documentacion/OpenIRP_Planificacion_Integral.md): solución .NET 10 en cuatro proyectos, PostgreSQL 17, contenedores Docker y Ollama local. Su implementación será incremental.
 
 ## Despliegue
 
@@ -116,7 +116,7 @@ OpenIRP contempla un despliegue basado en contenedores Docker, con el objetivo d
 
 Para las funcionalidades de inteligencia artificial se considera el uso de Ollama como servicio de inferencia local.
 
-Los requisitos de hardware, archivos de configuración, dependencias y procedimientos de instalación serán documentados y publicados cuando se encuentre disponible una versión reproducible del prototipo.
+La base del entorno de desarrollo usa PostgreSQL 17 y Ollama mediante Docker Compose. Para preparar el entorno local, copia `infra/.env.example` a `infra/.env` y cambia `POSTGRES_PASSWORD`. Antes de ejecutar Compose, crea el volumen externo con `docker volume create openirp_ollama_data`; desde la carpeta `infra`, ejecuta `docker compose up -d`. Se requiere Docker con acceso a GPU NVIDIA para la configuración actual de Ollama (`gpus: all`). El modelo de IA debe descargarse por separado.\n\nPara la API, configura la conexión sin subir secretos: `dotnet user-secrets set "ConnectionStrings:OpenIRP" "Host=127.0.0.1;Port=5433;Database=openirp_dev;Username=openirp;Password=TU_PASSWORD" --project apps/api/OpenIRP.Api`. Después ejecuta `dotnet run --project apps/api/OpenIRP.Api`. La configuración de desarrollo usa el puerto HTTP `5195` y HTTPS `7113` (consulta `launchSettings.json`). El endpoint `/api/health` responde de forma estática y todavía no comprueba la conectividad con PostgreSQL ni Ollama.\n\n**Estado:** la infraestructura inicial y la capa Identity están en desarrollo. La primera migración y las pruebas transaccionales de las organizaciones siguen pendientes.
 
 ## Alcance y limitaciones
 
