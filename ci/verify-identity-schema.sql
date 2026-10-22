@@ -39,6 +39,13 @@ BEGIN
         NULL; -- Expected.
     END;
 
+    INSERT INTO auth.asp_net_users
+        (id, is_active, created_at, normalized_email,
+         email_confirmed, phone_number_confirmed, two_factor_enabled,
+         lockout_enabled, access_failed_count)
+    VALUES (u2, true, now(), 'SECOND@OPENIRP.TEST',
+            false, false, false, false, 0);
+
     INSERT INTO app.organizations
         (id, name, slug, country_code, status, created_by_user_id, created_at)
     VALUES (o1, 'CI test org', 'ci-test-org', 'CL', 'ACTIVE', u1, now());
