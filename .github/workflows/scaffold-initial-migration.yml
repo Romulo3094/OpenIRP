@@ -31,7 +31,7 @@ jobs:
             --startup-project apps/api/OpenIRP.Api/OpenIRP.Api.csproj \
             --context OpenIrpDbContext \
             --output-dir Persistence/Migrations \
-            --no-build
+            --configuration Release --no-build
       - name: Commit generated migration to feature branch
         run: |
           git config user.name "github-actions[bot]"
