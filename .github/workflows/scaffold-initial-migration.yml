@@ -1,0 +1,42 @@
+# Temporary, branch-scoped scaffolder. Remove after initial migration is reviewed.
+name: Scaffold Identity migration
+on:
+  push:
+    branches: [feature/paso26-identidad-organizaciones]
+    paths:
+      - .github/workflows/scaffold-initial-migration.yml
+permissions:
+  contents: write
+
+jobs:
+  scaffold:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Install EF CLI
+        run: dotnet tool install --global dotnet-ef --version 10.0.5
+      - name: Restore
+        run: dotnet restore apps/api/OpenIRP.slnx
+      - name: Build
+        run: dotnet build apps/api/OpenIRP.slnx --no-restore --configuration Release
+      - name: Generate initial migration
+        run: |
+          dotnet ef migrations add InitialIdentityOrganizations \
+            --project apps/api/OpenIRP.Infrastructure/OpenIRP.Infrastructure.csproj \
+            --startup-project apps/api/OpenIRP.Api/OpenIRP.Api.csproj \
+            --context OpenIrpDbContext \
+            --output-dir Persistence/Migrations \
+            --no-build
+      - name: Commit generated migration to feature branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/api/OpenIRP.Infrastructure/Persistence/Migrations
+          if git diff --cached --quiet; then echo 'No migration generated'; exit 1; fi
+          git commit -m "feat(persistence): generar migracion inicial EF Core"
+          git push origin HEAD:feature/paso26-identidad-organizaciones
