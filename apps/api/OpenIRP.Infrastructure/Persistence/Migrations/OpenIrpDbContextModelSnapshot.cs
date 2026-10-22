@@ -184,6 +184,364 @@ namespace OpenIRP.Infrastructure.Persistence.Migrations
                     b.ToTable("asp_net_user_tokens", "auth");
                 });
 
+            modelBuilder.Entity("OpenIRP.Domain.Entities.Asset", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Criticality")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("criticality");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_assets");
+
+                    b.HasAlternateKey("OrganizationId", "Id")
+                        .HasName("ak_assets_organization_id_id");
+
+                    b.ToTable("assets", "app", t =>
+                        {
+                            t.HasCheckConstraint("ck_asset_criticality", "criticality IN ('LOW','MEDIUM','HIGH')");
+
+                            t.HasCheckConstraint("ck_asset_kind", "kind IN ('SERVER','WORKSTATION','CLOUDSERVICE','ACCOUNT','APPLICATION','NETWORKDEVICE','CRITICALSERVICE','OTHER')");
+
+                            t.HasCheckConstraint("ck_asset_name", "btrim(name) <> ''");
+
+                            t.HasCheckConstraint("ck_asset_revision", "revision > 0");
+
+                            t.HasCheckConstraint("ck_asset_status", "status IN ('ACTIVE','RETIRED')");
+                        });
+                });
+
+            modelBuilder.Entity("OpenIRP.Domain.Entities.AuditEvent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("action");
+
+                    b.Property<string>("ActorType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("actor_type");
+
+                    b.Property<Guid?>("ActorUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_user_id");
+
+                    b.Property<Guid>("CorrelationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("correlation_id");
+
+                    b.Property<string>("DetailsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("details_json");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<Guid?>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("outcome");
+
+                    b.Property<Guid?>("ResourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("resource_id");
+
+                    b.Property<string>("ResourceType")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("resource_type");
+
+                    b.HasKey("Id")
+                        .HasName("pk_audit_events");
+
+                    b.HasIndex("CorrelationId")
+                        .HasDatabaseName("ix_audit_events_correlation_id");
+
+                    b.HasIndex("OrganizationId", "Id")
+                        .HasDatabaseName("ix_audit_events_organization_id_id");
+
+                    b.ToTable("audit_events", "audit", t =>
+                        {
+                            t.HasCheckConstraint("ck_audit_actor", "actor_type IN ('USER','SYSTEM','ANONYMOUS') AND (actor_type <> 'USER' OR actor_user_id IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_audit_details", "jsonb_typeof(details_json) = 'object' AND octet_length(details_json::text) <= 4096");
+
+                            t.HasCheckConstraint("ck_audit_outcome", "outcome IN ('SUCCESS','DENIED','FAILURE')");
+                        });
+                });
+
+            modelBuilder.Entity("OpenIRP.Domain.Entities.CapabilityCatalogEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("category");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("code");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.HasKey("Id")
+                        .HasName("pk_capability_catalog");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_capability_catalog_code");
+
+                    b.ToTable("capability_catalog", "app", t =>
+                        {
+                            t.HasCheckConstraint("ck_capability_catalog_code", "code ~ '^[A-Z][A-Z0-9_]{1,59}$'");
+
+                            t.HasCheckConstraint("ck_capability_catalog_name", "btrim(name) <> '' AND btrim(category) <> ''");
+
+                            t.HasCheckConstraint("ck_capability_catalog_revision", "revision > 0");
+                        });
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("26000000-0000-4000-8000-000000000001"),
+                            Category = "PERSONNEL",
+                            Code = "IT_STAFF",
+                            IsActive = true,
+                            Name = "Personal de TI",
+                            Revision = 1L
+                        },
+                        new
+                        {
+                            Id = new Guid("26000000-0000-4000-8000-000000000002"),
+                            Category = "PERSONNEL",
+                            Code = "SECURITY_SPECIALIST",
+                            IsActive = true,
+                            Name = "Especialista de seguridad",
+                            Revision = 1L
+                        },
+                        new
+                        {
+                            Id = new Guid("26000000-0000-4000-8000-000000000003"),
+                            Category = "PERSONNEL",
+                            Code = "EXTERNAL_SUPPORT",
+                            IsActive = true,
+                            Name = "Soporte externo",
+                            Revision = 1L
+                        },
+                        new
+                        {
+                            Id = new Guid("26000000-0000-4000-8000-000000000004"),
+                            Category = "PROTECTION",
+                            Code = "ENDPOINT_PROTECTION",
+                            IsActive = true,
+                            Name = "Protección de endpoints",
+                            Revision = 1L
+                        },
+                        new
+                        {
+                            Id = new Guid("26000000-0000-4000-8000-000000000005"),
+                            Category = "VISIBILITY",
+                            Code = "SECURITY_LOGS",
+                            IsActive = true,
+                            Name = "Registros de seguridad",
+                            Revision = 1L
+                        },
+                        new
+                        {
+                            Id = new Guid("26000000-0000-4000-8000-000000000006"),
+                            Category = "ACCESS",
+                            Code = "MFA",
+                            IsActive = true,
+                            Name = "Autenticación multifactor",
+                            Revision = 1L
+                        },
+                        new
+                        {
+                            Id = new Guid("26000000-0000-4000-8000-000000000007"),
+                            Category = "RECOVERY",
+                            Code = "BACKUPS",
+                            IsActive = true,
+                            Name = "Respaldos",
+                            Revision = 1L
+                        },
+                        new
+                        {
+                            Id = new Guid("26000000-0000-4000-8000-000000000008"),
+                            Category = "RESPONSE",
+                            Code = "DEVICE_ISOLATION",
+                            IsActive = true,
+                            Name = "Aislamiento de dispositivos",
+                            Revision = 1L
+                        });
+                });
+
+            modelBuilder.Entity("OpenIRP.Domain.Entities.IncidentCategory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("category");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("code");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.HasKey("Id")
+                        .HasName("pk_incident_categories");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_incident_categories_code");
+
+                    b.ToTable("incident_categories", "app", t =>
+                        {
+                            t.HasCheckConstraint("ck_incident_categories_code", "code ~ '^[A-Z][A-Z0-9_]{1,59}$'");
+
+                            t.HasCheckConstraint("ck_incident_categories_name", "btrim(name) <> '' AND btrim(category) <> ''");
+
+                            t.HasCheckConstraint("ck_incident_categories_revision", "revision > 0");
+                        });
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("26000000-0000-4000-8100-000000000001"),
+                            Category = "SOCIAL_ENGINEERING",
+                            Code = "PHISHING",
+                            IsActive = true,
+                            Name = "Phishing",
+                            Revision = 1L
+                        },
+                        new
+                        {
+                            Id = new Guid("26000000-0000-4000-8100-000000000002"),
+                            Category = "IDENTITY",
+                            Code = "ACCOUNT_COMPROMISE",
+                            IsActive = true,
+                            Name = "Compromiso de cuenta",
+                            Revision = 1L
+                        },
+                        new
+                        {
+                            Id = new Guid("26000000-0000-4000-8100-000000000003"),
+                            Category = "MALWARE",
+                            Code = "RANSOMWARE",
+                            IsActive = true,
+                            Name = "Ransomware",
+                            Revision = 1L
+                        });
+                });
+
             modelBuilder.Entity("OpenIRP.Domain.Entities.Organization", b =>
                 {
                     b.Property<Guid>("Id")
@@ -255,6 +613,57 @@ namespace OpenIRP.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_organizations_slug", "slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'");
 
                             t.HasCheckConstraint("ck_organizations_status", "status IN ('ACTIVE','SUSPENDED','INACTIVE')");
+                        });
+                });
+
+            modelBuilder.Entity("OpenIRP.Domain.Entities.OrganizationCapability", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Availability")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("availability");
+
+                    b.Property<Guid>("CapabilityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("capability_id");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("notes");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.HasKey("Id")
+                        .HasName("pk_organization_capabilities");
+
+                    b.HasAlternateKey("OrganizationId", "Id")
+                        .HasName("ak_organization_capabilities_organization_id_id");
+
+                    b.HasIndex("CapabilityId")
+                        .HasDatabaseName("ix_organization_capabilities_capability_id");
+
+                    b.HasIndex("OrganizationId", "CapabilityId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_organization_capabilities_organization_id_capability_id");
+
+                    b.ToTable("organization_capabilities", "app", t =>
+                        {
+                            t.HasCheckConstraint("ck_org_capability_availability", "availability IN ('UNKNOWN','AVAILABLE','UNAVAILABLE')");
+
+                            t.HasCheckConstraint("ck_org_capability_revision", "revision > 0");
                         });
                 });
 
@@ -508,6 +917,16 @@ namespace OpenIRP.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_asp_net_user_tokens_asp_net_users_user_id");
                 });
 
+            modelBuilder.Entity("OpenIRP.Domain.Entities.Asset", b =>
+                {
+                    b.HasOne("OpenIRP.Domain.Entities.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_assets_organizations_organization_id");
+                });
+
             modelBuilder.Entity("OpenIRP.Domain.Entities.Organization", b =>
                 {
                     b.HasOne("OpenIRP.Infrastructure.Identity.ApplicationUser", null)
@@ -516,6 +935,23 @@ namespace OpenIRP.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_organizations_asp_net_users_created_by_user_id");
+                });
+
+            modelBuilder.Entity("OpenIRP.Domain.Entities.OrganizationCapability", b =>
+                {
+                    b.HasOne("OpenIRP.Domain.Entities.CapabilityCatalogEntry", null)
+                        .WithMany()
+                        .HasForeignKey("CapabilityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_organization_capabilities_capability_catalog_capability_id");
+
+                    b.HasOne("OpenIRP.Domain.Entities.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_organization_capabilities_organizations_organization_id");
                 });
 
             modelBuilder.Entity("OpenIRP.Domain.Entities.OrganizationMembership", b =>

@@ -1,3 +1,4 @@
+using OpenIRP.Infrastructure.Persistence.Configurations;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -18,6 +19,32 @@ public sealed class OpenIrpDbContext : IdentityDbContext<ApplicationUser, Identi
     public DbSet<OrganizationMembership> OrganizationMemberships => Set<OrganizationMembership>();
     public DbSet<PlatformAdministrator> PlatformAdministrators => Set<PlatformAdministrator>();
 
+    public DbSet<CapabilityCatalogEntry> CapabilityCatalog => Set<CapabilityCatalogEntry>();
+    public DbSet<IncidentCategory> IncidentCategories => Set<IncidentCategory>();
+    public DbSet<OrganizationCapability> OrganizationCapabilities => Set<OrganizationCapability>();
+    public DbSet<Asset> Assets => Set<Asset>();
+
+    public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
+
+    private void CheckAuditChanges()
+    {
+        ChangeTracker.DetectChanges();
+        if (ChangeTracker.Entries<AuditEvent>().Any(e => e.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("Audit events are append-only.");
+    }
+
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        CheckAuditChanges();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        CheckAuditChanges();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -25,8 +52,32 @@ public sealed class OpenIrpDbContext : IdentityDbContext<ApplicationUser, Identi
         ConfigureOrganization(builder);
         ConfigureMembership(builder);
         ConfigurePlatformAdministrator(builder);
+        ConfigureAudit(builder);
+        InventoryMapping.Apply(builder);
     }
 
+    private static void ConfigureAudit(ModelBuilder builder)
+    {
+        builder.Entity<AuditEvent>(b =>
+        {
+            b.ToTable("audit_events", "audit", t =>
+            {
+                t.HasCheckConstraint("ck_audit_actor", "actor_type IN ('USER','SYSTEM','ANONYMOUS') AND (actor_type <> 'USER' OR actor_user_id IS NOT NULL)");
+                t.HasCheckConstraint("ck_audit_outcome", "outcome IN ('SUCCESS','DENIED','FAILURE')");
+                t.HasCheckConstraint("ck_audit_details", "jsonb_typeof(details_json) = 'object' AND octet_length(details_json::text) <= 4096");
+            });
+            b.HasKey(e => e.Id);
+            b.Property(e => e.Id).UseIdentityAlwaysColumn();
+            b.Property(e => e.ActorType).HasMaxLength(20);
+            b.Property(e => e.Action).HasMaxLength(100);
+            b.Property(e => e.ResourceType).HasMaxLength(60);
+            b.Property(e => e.Outcome).HasMaxLength(20);
+            b.Property(e => e.DetailsJson).HasColumnType("jsonb");
+            b.Property(e => e.OccurredAt).HasColumnType("timestamp with time zone");
+            b.HasIndex(e => new { e.OrganizationId, e.Id });
+            b.HasIndex(e => e.CorrelationId);
+        });
+    }
     private static void ConfigureIdentity(ModelBuilder builder)
     {
         builder.Entity<ApplicationUser>(b =>

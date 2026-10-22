@@ -1,6 +1,6 @@
 \set ON_ERROR_STOP on
 
--- Integration checks on an EPHEMERAL PostgreSQL 17 database only.
+-- Integration checks on an EPHEMERAL PostgreSQL 17/18 database only.
 -- This script intentionally rolls back all inserted fixtures.
 BEGIN;
 
@@ -103,7 +103,7 @@ BEGIN
     BEGIN
         DELETE FROM auth.asp_net_users WHERE id = u1;
         RAISE EXCEPTION 'Expected creator/membership FK to reject user deletion';
-    EXCEPTION WHEN foreign_key_violation THEN NULL;
+    EXCEPTION WHEN foreign_key_violation OR restrict_violation THEN NULL;
     END;
 
     RAISE NOTICE 'All initial Identity/organization schema checks passed';
