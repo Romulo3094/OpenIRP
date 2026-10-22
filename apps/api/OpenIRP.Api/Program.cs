@@ -14,7 +14,7 @@ var connectionString = builder.Configuration.GetConnectionString("OpenIRP")
         "Configure ConnectionStrings:OpenIRP using .NET user-secrets or an environment variable.");
 
 builder.Services.AddDbContext<OpenIrpDbContext>(options =>
-    options.UseNpgsql(connectionString));
+    options.UseNpgsql(connectionString).UseSnakeCaseNamingConvention());
 
 builder.Services.AddIdentityCore<ApplicationUser>(options =>
     {
