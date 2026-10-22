@@ -63,7 +63,7 @@ BEGIN
     BEGIN
         INSERT INTO app.organizations
             (id, name, slug, country_code, status, created_by_user_id, created_at)
-        VALUES (gen_random_uuid(), 'Invalid', 'ci-invalid-org', 'chile', 'ACTIVE', u1, now());
+        VALUES (gen_random_uuid(), 'Invalid', 'ci-invalid-org', 'cl', 'ACTIVE', u1, now());
         RAISE EXCEPTION 'Expected country-code check violation';
     EXCEPTION WHEN check_violation THEN NULL;
     END;
