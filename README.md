@@ -116,7 +116,17 @@ OpenIRP contempla un despliegue basado en contenedores Docker, con el objetivo d
 
 Para las funcionalidades de inteligencia artificial se considera el uso de Ollama como servicio de inferencia local.
 
-La base del entorno de desarrollo usa PostgreSQL 17 y Ollama mediante Docker Compose. Para preparar el entorno local, copia `infra/.env.example` a `infra/.env` y cambia `POSTGRES_PASSWORD`. Antes de ejecutar Compose, crea el volumen externo con `docker volume create openirp_ollama_data`; desde la carpeta `infra`, ejecuta `docker compose up -d`. Se requiere Docker con acceso a GPU NVIDIA para la configuración actual de Ollama (`gpus: all`). El modelo de IA debe descargarse por separado.\n\nPara la API, configura la conexión sin subir secretos: `dotnet user-secrets set "ConnectionStrings:OpenIRP" "Host=127.0.0.1;Port=5433;Database=openirp_dev;Username=openirp;Password=TU_PASSWORD" --project apps/api/OpenIRP.Api`. Después ejecuta `dotnet run --project apps/api/OpenIRP.Api`. La configuración de desarrollo usa el puerto HTTP `5195` y HTTPS `7113` (consulta `launchSettings.json`). El endpoint `/api/health` responde de forma estática y todavía no comprueba la conectividad con PostgreSQL ni Ollama.\n\n**Estado:** la infraestructura inicial y la capa Identity están en desarrollo. La primera migración y las pruebas transaccionales de las organizaciones siguen pendientes.
+La base del entorno de desarrollo usa PostgreSQL 17 y Ollama mediante Docker Compose. Para preparar el entorno local, copia `infra/.env.example` a `infra/.env` y cambia `POSTGRES_PASSWORD`. Antes de ejecutar Compose, crea el volumen externo con `docker volume create openirp_ollama_data`; desde la carpeta `infra`, ejecuta `docker compose up -d`. Se requiere Docker con acceso a GPU NVIDIA para la configuración actual de Ollama (`gpus: all`). El modelo de IA debe descargarse por separado.\n\nPara la API, configura la conexión sin subir secretos: `dotnet user-secrets set "ConnectionStrings:OpenIRP" "Host=127.0.0.1;Port=5433;Database=openirp_dev;Username=openirp;Password=TU_PASSWORD" --project apps/api/OpenIRP.Api`. Después ejecuta `dotnet run --project apps/api/OpenIRP.Api`. La configuración de desarrollo usa el puerto HTTP `5195` y HTTPS `7113` (consulta `launchSettings.json`). El endpoint `/api/health` responde de forma estática y todavía no comprueba la conectividad con PostgreSQL ni Ollama.\n\n**Estado:** la infraestructura inicial y la capa Identity están en desarrollo. La migración `InitialIdentityOrganizations` está generada y fue aplicada y verificada sobre PostgreSQL 17 temporal en GitHub Actions. **No se ha aplicado a tu base local**, y siguen pendientes el aprovisionamiento controlado de administradores, los servicios de alta de organizaciones y las pruebas transaccionales de negocio.
+
+**Primera migración (cuando se autorice su aplicación local):** además del secreto para arrancar la API, la factoría de EF Core necesita `ConnectionStrings__OpenIRP` como variable de entorno durante `dotnet ef database update`. En PowerShell configura esa variable solo en la sesión actual y usa:
+
+```powershell
+dotnet tool install --global dotnet-ef --version 10.0.5
+dotnet ef database update --project apps/api/OpenIRP.Infrastructure/OpenIRP.Infrastructure.csproj --startup-project apps/api/OpenIRP.Api/OpenIRP.Api.csproj --context OpenIrpDbContext
+Remove-Item Env:\ConnectionStrings__OpenIRP
+```
+
+No apliques la migración a bases con datos existentes sin revisar antes el script y su respaldo; la conexión deberá apuntar al entorno de desarrollo deseado.
 
 ## Alcance y limitaciones
 
