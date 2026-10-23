@@ -21,6 +21,20 @@ BEGIN
     EXECUTE format('GRANT USAGE ON SCHEMA auth, app TO %I', runtime_name);
     EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA auth, app TO %I', runtime_name);
     EXECUTE format('GRANT USAGE ON ALL SEQUENCES IN SCHEMA auth, app TO %I', runtime_name);
+    IF to_regclass('app.incident_capability_assessments') IS NOT NULL THEN
+        EXECUTE format('REVOKE ALL ON TABLE app.incident_capability_assessments FROM %I', runtime_name);
+        EXECUTE format('GRANT SELECT, INSERT ON TABLE app.incident_capability_assessments TO %I', runtime_name);
+        EXECUTE format('GRANT UPDATE (availability, limitations, reason, assessed_at_revision) ON TABLE app.incident_capability_assessments TO %I', runtime_name);
+    END IF;
+    IF to_regclass('app.incident_assets') IS NOT NULL THEN
+        EXECUTE format('REVOKE ALL ON TABLE app.incident_assets FROM %I', runtime_name);
+        EXECUTE format('GRANT SELECT, INSERT ON TABLE app.incident_assets TO %I', runtime_name);
+        EXECUTE format('GRANT UPDATE (asset_id, linked_at_revision) ON TABLE app.incident_assets TO %I', runtime_name);
+    END IF;
+    IF to_regclass('app.incident_events') IS NOT NULL THEN
+        EXECUTE format('REVOKE ALL ON TABLE app.incident_events FROM %I', runtime_name);
+        EXECUTE format('GRANT SELECT, INSERT ON TABLE app.incident_events TO %I', runtime_name);
+    END IF;
     EXECUTE format('REVOKE ALL ON SCHEMA audit FROM %I', runtime_name);
     EXECUTE format('GRANT USAGE ON SCHEMA audit TO %I', runtime_name);
     EXECUTE format('REVOKE ALL ON TABLE audit.audit_events FROM %I', runtime_name);

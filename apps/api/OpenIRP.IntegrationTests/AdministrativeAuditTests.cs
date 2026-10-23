@@ -260,6 +260,49 @@ public sealed partial class IdentityAdministrationTests
                 await inventory.CreateAssetAsync(administrator, organization.Id, new("Runtime asset", AssetKind.Server, AssetCriticality.High, null));
                 await inventory.CreateCatalogAsync(platform, OpenIRP.Application.Inventory.CatalogKind.Capabilities, new("RUNTIME_EXTENSION", "Runtime", "CUSTOM", null));
                 Assert.Equal(5, await db.AuditEvents.CountAsync());
+                var incidents = scope.ServiceProvider.GetRequiredService<OpenIRP.Application.Incidents.IIncidentService>();
+                var category = await db.IncidentCategories.Select(c => c.Id).FirstAsync();
+                var registered = await incidents.CreateAsync(administrator, organization.Id, new(category, "Runtime incident", null));
+                await incidents.UpdateAsync(administrator, organization.Id, registered.Id, new(category, "Runtime corrected", null, "Correction", 1));
+                Assert.Equal(2, (await incidents.EventsAsync(administrator, organization.Id, registered.Id)).Items.Count);
+                Assert.Equal(7, await db.AuditEvents.CountAsync());
+                var reported = await incidents.ReportAssetAsync(administrator, organization.Id, registered.Id,
+                    new("Reported runtime host", AssetKind.Workstation, "Original observation", null, "Report", 2));
+                var asset = await db.Assets.Select(a => a.Id).SingleAsync();
+                await incidents.LinkAssetAsync(administrator, organization.Id, registered.Id, reported.Asset.Id, new(asset, "Identify", 3));
+                Assert.Single((await incidents.AssetsAsync(administrator, organization.Id, registered.Id)).Items);
+                Assert.Equal(9, await db.AuditEvents.CountAsync());
+                await incidents.AssessCapabilityAsync(administrator, organization.Id, registered.Id, capabilityId,
+                    new(CapabilityAvailability.Unavailable, "Runtime limitation", "Assessment", 4, 1, 1));
+                await incidents.AssessCapabilityAsync(administrator, organization.Id, registered.Id, capabilityId,
+                    new(null, null, "Inherit again", 5, 1, 1));
+                var effective = (await incidents.CapabilitiesAsync(administrator, organization.Id, registered.Id)).Items.Single(c => c.CapabilityId == capabilityId);
+                Assert.Equal(CapabilityAvailability.Available, effective.EffectiveAvailability);
+                Assert.Null(effective.OverrideAvailability);
+                Assert.Equal(11, await db.AuditEvents.CountAsync());
+                var assessed = await incidents.AssessImpactAsync(administrator, organization.Id, registered.Id,
+                    new(ImpactLevel.High, ImpactLevel.None, ImpactLevel.Low, "Runtime CIA", 6));
+                Assert.True(assessed.IsImpactAssessmentComplete);
+                await incidents.UpdateAsync(administrator, organization.Id, registered.Id,
+                    new(category, "Still assessed", null, "Title correction", 7));
+                var latest = (await incidents.EventsAsync(administrator, organization.Id, registered.Id)).Items.Last();
+                Assert.Equal(ImpactLevel.High, latest.ConfidentialityImpact);
+                Assert.Equal(13, await db.AuditEvents.CountAsync());
+                foreach (var sql in new[] { "UPDATE app.incident_capability_assessments SET capability_id=capability_id", "DELETE FROM app.incident_capability_assessments", "TRUNCATE app.incident_capability_assessments", "ALTER TABLE app.incident_capability_assessments DISABLE TRIGGER ALL" })
+                {
+                    var error = await Assert.ThrowsAsync<PostgresException>(() => db.Database.ExecuteSqlRawAsync(sql));
+                    Assert.Equal("42501", error.SqlState);
+                }
+                foreach (var sql in new[] { "UPDATE app.incident_assets SET reported_name='Tampered'", "DELETE FROM app.incident_assets", "TRUNCATE app.incident_assets", "ALTER TABLE app.incident_assets DISABLE TRIGGER ALL" })
+                {
+                    var error = await Assert.ThrowsAsync<PostgresException>(() => db.Database.ExecuteSqlRawAsync(sql));
+                    Assert.Equal("42501", error.SqlState);
+                }
+                foreach (var sql in new[] { "UPDATE app.incident_events SET title='Tampered'", "DELETE FROM app.incident_events", "TRUNCATE app.incident_events", "ALTER TABLE app.incident_events DISABLE TRIGGER ALL" })
+                {
+                    var error = await Assert.ThrowsAsync<PostgresException>(() => db.Database.ExecuteSqlRawAsync(sql));
+                    Assert.Equal("42501", error.SqlState);
+                }
                 foreach (var sql in new[] { "UPDATE audit.audit_events SET outcome='FAILURE'", "DELETE FROM audit.audit_events", "TRUNCATE audit.audit_events", "ALTER TABLE audit.audit_events DISABLE TRIGGER ALL" })
                 {
                     var error = await Assert.ThrowsAsync<PostgresException>(() => db.Database.ExecuteSqlRawAsync(sql));

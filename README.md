@@ -134,7 +134,7 @@ No apliques la migración a bases con datos existentes sin revisar antes el scri
 
 ### Auditoría administrativa local
 
-La subfase siguiente del Paso 26 incorpora eventos transaccionales, consultas de auditoría con permisos por organización y protección append-only. La migración `BasicAdministrativeAudit` ya fue aplicada a `openirp_dev` con respaldo/restauración comprobados y sin alterar los datos de negocio. La suite actual pasa 37/37 casos tanto en PostgreSQL 17 como en 18.
+La subfase siguiente del Paso 26 incorpora eventos transaccionales, consultas de auditoría con permisos por organización y protección append-only. La migración `BasicAdministrativeAudit` ya fue aplicada a `openirp_dev` con respaldo/restauración comprobados y sin alterar los datos de negocio. La validación de esa subfase pasó 37/37 casos tanto en PostgreSQL 17 como en 18.
 
 Consulta [la guía de auditoría](OpenIRP_Documentacion/Paso26_Auditoria_Local.md) para ver endpoints, permisos SQL, archivos y límites. Para repetir con Docker usa `./ci/Test-IdentityDocker.ps1`; para PostgreSQL nativo, `./ci/Test-IdentityLocal.ps1`. No se habilitó registro público ni acceso global a tenants.
 
@@ -142,7 +142,35 @@ Consulta [la guía de auditoría](OpenIRP_Documentacion/Paso26_Auditoria_Local.m
 
 La Iteración 2 incorpora catálogos de capacidades/categorías, perfil organizacional con UNKNOWN implícito y activos con revisión y retirada lógica. Los permisos se comprueban por organización y las escrituras se auditan dentro de su transacción. La migración local se aplicó tras respaldo y restauración de prueba, conservando los datos previos.
 
-La suite actual pasa 68/68 casos en PostgreSQL 17 y 68/68 en PostgreSQL 18. Consulta [contratos, permisos, archivos y evidencias](OpenIRP_Documentacion/Iteracion2_Catalogos_Capacidades_Activos.md). Puedes iniciar la API con `./ci/Start-LocalApi.ps1`; los nuevos endpoints aparecen en OpenAPI de desarrollo.
+La validación de esa subfase pasó 68/68 casos en PostgreSQL 17 y 68/68 en PostgreSQL 18. Consulta [contratos, permisos, archivos y evidencias](OpenIRP_Documentacion/Iteracion2_Catalogos_Capacidades_Activos.md). Puedes iniciar la API con `./ci/Start-LocalApi.ps1`; los nuevos endpoints aparecen en OpenAPI de desarrollo.
+
+### Registro inicial de incidentes local
+
+La Iteración 3 agrega registro, consulta, corrección y asignación de incidentes, con historial inmutable por revisión y auditoría transaccional. ORG_ADMIN/ANALYST activos pueden escribir en su organización; VIEWER lee. El permiso global no evita la membresía del tenant. Las revisiones obsoletas se rechazan con 409.
+
+La migración `InitialIncidentRegister` está aplicada en `openirp_dev` tras respaldar y restaurar una copia aislada, conservando datos previos. La validación de esa subfase pasó **94/94 pruebas en PostgreSQL 17 y 94/94 en PostgreSQL 18**, sin omitidas. Consulta [rutas, contratos, archivos y evidencias](OpenIRP_Documentacion/Iteracion3_Registro_Incidentes.md).
+
+Esta subfase conserva el estado REGISTERED: evaluación CIA, severidad, respuesta y cierre siguen pendientes de la regla determinista y sus controles. No se asigna severidad baja por omisión. El avance previo se publicó en `d7ced5f`; los cambios de incidentes permanecen locales, posteriores a ese commit.
+
+### Activos afectados por incidente
+
+La Iteración 4 permite reportar activos todavía no inventariados, adjuntar activos existentes y vincularlos después conservando nombre, tipo, contexto y criticidad históricos. Cada operación exige motivo y revisión del incidente, con permisos por organización, snapshots y auditoría transaccionales. La criticidad desconocida debe expresarse como null, sin asumir un nivel bajo.
+
+La nueva migración está aplicada en la base local tras respaldo y restauración aislada verificados. Validación de esa subfase: **127/127 pruebas en PostgreSQL 17 y 127/127 en PostgreSQL 18**. Consulta [endpoints, archivos, evidencia y pendientes](OpenIRP_Documentacion/Iteracion4_Activos_Incidente.md). Los cambios nuevos de incidentes y asociaciones siguen locales, sin otro commit/push.
+
+### Capacidades y limitaciones por incidente
+
+La Iteración 5 permite heredar el perfil de la organización o evaluar disponibilidad específica del incidente, con motivo, limitaciones e historial. Unknown explícito es distinto de heredar. Se comprueban las revisiones del incidente, perfil y catálogo para rechazar decisiones basadas en contexto obsoleto. ANALYST puede documentar el incidente; el perfil general sigue reservado a ORG_ADMIN.
+
+Migración local aplicada tras respaldo y restauración de prueba, conservando los datos previos. Validación de esa subfase: **156/156 pruebas en PostgreSQL 17 y 156/156 en PostgreSQL 18**, sin fallidas ni omitidas. Consulta [endpoints, archivos y evidencias](OpenIRP_Documentacion/Iteracion5_Capacidades_Incidente.md). Los cambios continúan locales sin nuevo commit/push; CIA, regla de severidad y ciclo de vida completo siguen pendientes.
+
+### Evaluación de impacto CIA
+
+La Iteración 6 permite evaluar confidencialidad, integridad y disponibilidad con None/Low/Medium/High o null explícito cuando falta investigar. Exige motivo y revisión, protege datos por organización y conserva CIA en el historial de todas las modificaciones posteriores. No deriva severidad ni autoriza cierre automáticamente.
+
+Migración local aplicada tras respaldo/restauración verificados, conservando datos previos. Suite actual: **181/181 pruebas en PostgreSQL 17 y 181/181 en PostgreSQL 18**, sin fallidas ni omitidas. Consulta [archivos, endpoints y evidencias CIA](OpenIRP_Documentacion/Iteracion6_Evaluacion_CIA.md).
+
+La [propuesta de severidad v1](OpenIRP_Documentacion/Propuesta_Regla_Severidad_v1.md) incluye una matriz comprobada en un prototipo matemático aislado, todavía sin activar en la API. La política de desconocidos está confirmada: Pending y severity=null hasta completar todas las entradas requeridas, sin severidad provisional. Los umbrales siguen sujetos a revisión. Los cambios de desarrollo continúan locales, sin nuevo commit/push.
 
 ## Alcance y limitaciones
 

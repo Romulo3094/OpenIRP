@@ -1,3 +1,5 @@
+using OpenIRP.Application.Incidents;
+using OpenIRP.Infrastructure.Incidents;
 using OpenIRP.Application.Inventory;
 using OpenIRP.Infrastructure.Inventory;
 using OpenIRP.Application.Audit;
@@ -51,6 +53,7 @@ builder.Services.AddScoped<AuditContext>();
 builder.Services.AddScoped<AuditRecorder>();
 builder.Services.AddScoped<IAuditReader, AuditReader>();
 builder.Services.AddScoped<IInventoryService, InventoryService>();
+builder.Services.AddScoped<IIncidentService, IncidentService>();
 var app = builder.Build();
 
 // Explicit offline command: no startup seeding, HTTP listener, implicit migration or public bootstrap route.

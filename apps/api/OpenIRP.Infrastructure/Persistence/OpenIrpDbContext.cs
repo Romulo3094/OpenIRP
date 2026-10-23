@@ -23,6 +23,10 @@ public sealed class OpenIrpDbContext : IdentityDbContext<ApplicationUser, Identi
     public DbSet<IncidentCategory> IncidentCategories => Set<IncidentCategory>();
     public DbSet<OrganizationCapability> OrganizationCapabilities => Set<OrganizationCapability>();
     public DbSet<Asset> Assets => Set<Asset>();
+    public DbSet<Incident> Incidents => Set<Incident>();
+    public DbSet<IncidentAsset> IncidentAssets => Set<IncidentAsset>();
+    public DbSet<IncidentCapabilityAssessment> IncidentCapabilityAssessments => Set<IncidentCapabilityAssessment>();
+    public DbSet<IncidentEvent> IncidentEvents => Set<IncidentEvent>();
 
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
 
@@ -31,6 +35,8 @@ public sealed class OpenIrpDbContext : IdentityDbContext<ApplicationUser, Identi
         ChangeTracker.DetectChanges();
         if (ChangeTracker.Entries<AuditEvent>().Any(e => e.State is EntityState.Modified or EntityState.Deleted))
             throw new InvalidOperationException("Audit events are append-only.");
+        if (ChangeTracker.Entries<IncidentEvent>().Any(e => e.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("Incident events are append-only.");
     }
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
@@ -54,6 +60,9 @@ public sealed class OpenIrpDbContext : IdentityDbContext<ApplicationUser, Identi
         ConfigurePlatformAdministrator(builder);
         ConfigureAudit(builder);
         InventoryMapping.Apply(builder);
+        IncidentMapping.Apply(builder);
+        IncidentAssetMapping.Apply(builder);
+        IncidentCapabilityMapping.Apply(builder);
     }
 
     private static void ConfigureAudit(ModelBuilder builder)
