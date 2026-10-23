@@ -630,7 +630,7 @@ flowchart LR
 | Recuperación de respaldos | Restauración documentada y probada en entorno seguro. |
 | Políticas RLS antes del despliegue multi-tenant | Pruebas positivas/negativas verificadas. |
 
-**Estado de la matriz:** criterios previstos, **no** suite implementada ni ejecutada aún.
+**Estado de la matriz al cerrar la planificación:** criterios previstos. La evidencia implementada posteriormente para Identity, organizaciones y membresías se registra en las secciones 21 a 23; el resto de la matriz permanece pendiente.
 
 # 16. Metodología de evaluación de la investigación
 
@@ -796,3 +796,194 @@ Una operación debe vincular usuario, organización activa, membresía vigente, 
 ---
 
 **Fin de la línea base de planificación.** Próxima actividad autorizada: Paso 26 — implementación incremental de Identity, organizaciones y membresías. Cualquier desviación de las decisiones cerradas deberá documentarse con su motivación, impacto, nueva versión del diseño y pruebas asociadas.
+
+# 21. Paso 26 — subfase local de administración de identidad (22-10-2026)
+
+## 21.1. Alcance implementado
+
+Sobre `feature/paso26-identidad-organizaciones`, desde `f53c99a`, se añadieron contratos y servicios de aplicación para aprovisionamiento offline del primer `PLATFORM_ADMIN`, alta atómica de organización/cuenta/primer `ORG_ADMIN`, administración de membresías y desactivación controlada de cuentas. Se conserva el esquema y la migración aprobada `20261022130822_InitialIdentityOrganizations` sin reescribirla ni agregar cambios al modelo.
+
+El bootstrap requiere comando y habilitación explícitos; cualquier concesión histórica impide repetirlo y nunca se promueven cuentas existentes. No existe registro público ni endpoint de bootstrap. Los permisos de plataforma no conceden acceso implícito a datos del tenant: las operaciones organizacionales verifican membresía, rol y estado vigentes en base de datos.
+
+La regla del último administrador activo se comprueba dentro de la misma transacción de suspensión, revocación, degradación o desactivación de cuenta. Las escrituras administrativas toman un advisory lock transaccional común en PostgreSQL y releen la autorización después de adquirirlo. Esta estrategia conservadora también coordina cambios globales de cuenta con sus múltiples organizaciones. Las revisiones de membresía y los conflictos/tiempos de espera se expresan mediante HTTP 409.
+
+Se incorporaron sesiones por cookie HTTPS, CSRF por token, bloqueo por intentos fallidos, comprobación de cuenta/security stamp por petición y rutas de organizaciones, membresías y estado de cuenta. El arranque normal no aplica migraciones ni crea administradores.
+
+## 21.2. Evidencia ejecutada localmente
+
+| Comprobación | Resultado verificado |
+|---|---|
+| Git inicial | Rama solicitada y árbol limpio; sin cambios previos que sobrescribir. |
+| SDK y compilación | .NET SDK 10.0.402; compilación Release con 0 errores y 0 advertencias. |
+| PostgreSQL 18.3 nativo aislado | Migración y comprobaciones SQL correctas; 22 pruebas correctas, 0 fallidas, 0 omitidas. |
+| PostgreSQL 17.11 en contenedor aislado | Migración y comprobaciones SQL correctas; mismas 22 pruebas correctas, 0 fallidas, 0 omitidas. |
+| Concurrencia | Las pruebas comprueban en pg_locks que ambos escritores están esperando antes de liberar el bloqueo. Solo un bootstrap/slug prospera; siempre queda un administrador tras revocaciones o desactivación frente a degradación. |
+| CLI offline real | Rechazo sin habilitación; creación única en base temporal; rechazo al repetir. |
+| Consistencia del modelo | `dotnet ef migrations has-pending-model-changes`: sin diferencias respecto a la migración aprobada. |
+| Base habitual local | `openirp_dev`, usuario `openirp`, 127.0.0.1:5433; inspeccionada sin tablas antes de migrar. |
+| Respaldo previo | Dump custom de la base vacía, restaurado con éxito en otro contenedor PostgreSQL 17 antes de aplicar la migración. |
+| Migración habitual | Historial confirma `20261022130822_InitialIdentityOrganizations` / EF 10.0.5. Usuarios, organizaciones y administradores de plataforma permanecen en cero. |
+| API real en Windows | Arranque mediante `ci/Start-LocalApi.ps1`; HTTPS health 200, CSRF 200 con token, acceso anónimo a organizaciones 401. Proceso de comprobación detenido después. |
+
+Los casos cubren rollback tras insertar la organización, contraseñas rechazadas, correo/slug duplicados, bootstrap histórico, ausencia de promoción de cuentas existentes, límites entre tenants, privilegios de plataforma sin bypass organizacional, revisiones obsoletas, suspensión de permisos, invalidación de sesión y bloqueo por contraseña errónea.
+
+Artefactos locales ignorados por Git, bajo la raíz `D:\Desarrollos\OpenIRP`:
+
+- `artifacts/paso26-f858a3dc5f2c4a00a2513efe8329985b/paso26.trx`: PostgreSQL 18, 22/22; el mismo directorio contiene SQL idempotente y dump temporal.
+- `artifacts/paso26-pg17-ff41cf6a313549f999e0a8f3cfcf2141/paso26-pg17.trx`: PostgreSQL 17, 22/22.
+- `artifacts/paso26-dev-migration-8a6c4702a55c4e62acce7d8282a997fa/openirp_dev-before-paso26.dump`: respaldo previo, SHA256 `55ABB09C9FD46E842D87990B13981711D2CBA356CE78211664058B162A717172`.
+- `artifacts/paso26-http-smoke/`: logs de la comprobación HTTPS real. Solo esa comprobación omitió la validación del certificado local; el servidor y sus cookies conservan HTTPS/Secure.
+
+Docker Desktop se inició para comprobar PostgreSQL 17; con ello se reactivaron los contenedores locales existentes de PostgreSQL y Ollama. Los contenedores y procesos temporales de validación se detuvieron/eliminaron; el servicio PostgreSQL 18 del sistema no se modificó.
+
+## 21.3. Uso local y pendientes explícitos
+
+La [guía operativa del Paso 26](Paso26_Administracion_Local.md) contiene el inventario de archivos, contratos HTTP, comandos de repetición y manejo de secretos. Para comenzar con una identidad real, ejecutar `./ci/Start-LocalApi.ps1 -Bootstrap` en terminal interactiva con correo verificado fuera de banda y contraseña elegida por el operador; después `./ci/Start-LocalApi.ps1`. No se guardan esas credenciales en el repositorio ni se inventó un administrador del usuario durante la intervención.
+
+La garantía del último administrador pertenece a estos servicios: SQL directo y futuros escritores deben respetar el mismo protocolo. El advisory lock común limita la concurrencia de las escrituras administrativas y puede sustituirse posteriormente por coordinación más granular con pruebas equivalentes. RLS, auditoría integral, separación de permisos SQL operativos, recuperación de cuenta, MFA, cambio obligatorio de contraseña inicial y verificación mediante envío de correo siguen pendientes antes del uso operativo multiempresa. Las cuentas de alta controlada se marcan confirmadas bajo verificación del operador, sin afirmar que hubo envío de correo.
+
+El archivo CI PostgreSQL 17 se actualizó solo en disco para ejecutar esta suite en futuras ejecuciones autorizadas. **No se hizo push, merge, commit ni modificación remota de GitHub/PR #1.**
+
+# 22. Paso 26 — auditoría administrativa básica (22-10-2026)
+
+Se implementó `audit.audit_events` y la migración nueva `20261022175420_BasicAdministrativeAudit`, preservando la inicial aprobada y los cambios locales de la subfase anterior. Las escrituras administrativas y su evento SUCCESS comparten transacción; un fallo del evento revierte la operación. Los rechazos administrativos se registran por conexión separada tras rollback, siempre en ámbito global y con metadatos mínimos sin secretos ni datos de la petición.
+
+Los endpoints `GET /api/organizations/{id}/audit` y `GET /api/audit/global` tienen paginación limitada y permisos distintos: ORG_ADMIN del tenant frente a PLATFORM_ADMIN solo para eventos globales. Se conserva la prohibición de acceso implícito a tenants. El servidor genera y devuelve la correlación de cada scope HTTP.
+
+La protección append-only combina validación EF, trigger PostgreSQL que rechaza UPDATE/DELETE/TRUNCATE y un script de permisos SELECT/INSERT para una cuenta SQL limitada. Se probó la operación completa de Identity con dicha cuenta en una base desechable, incluido el rechazo de alteración/desactivación del trigger. El helper de desarrollo conserva la cuenta propietaria previa; no se afirmó una separación operativa ya aplicada a las credenciales habituales.
+
+**Decisión física acotada respecto a §14.1:** la PK interna de auditoría es BIGINT IDENTITY para un cursor indexado que no dependa del reloj, mientras actores, organización, recursos y correlación mantienen UUID. El ID no concede autorización ni representa un orden de commit global. Impacto: solo los contratos de eventos/cursor usan valores numéricos. La paginación, el aislamiento y la ausencia de duplicados en las páginas se verificaron. Las referencias históricas no tienen cascadas hacia datos mutables de identidad.
+
+**Resultados:** Release sin errores ni advertencias; 37/37 pruebas en PostgreSQL 17.11 y 37/37 en 18.3, sin omitidas. Se incluyen las 22 pruebas previas más 15 casos de auditoría: rollback por fallo del sink, separación de rechazos, caída de su persistencia sin sustituir el error original, inmutabilidad SQL/EF, permisos runtime reales, correlación HTTP, paginación y aislamiento. Reversión/reaplicación de la migración verificada solo en base vacía desechable; modelo sin cambios pendientes.
+
+La migración local se aplicó a `openirp_dev` después de respaldar y restaurar la copia en un contenedor PostgreSQL 17 aislado. Los conteos de usuarios, organizaciones, membresías y concesiones se conservaron (todos cero); la tabla de auditoría comienza vacía. No se crearon identidades de negocio ni roles SQL en el cluster habitual.
+
+Evidencias bajo `D:\Desarrollos\OpenIRP`:
+
+- PostgreSQL 17: `artifacts/paso26-pg17-b504fc4e9dea4f4d9a97fec03248c7e5/paso26-pg17.trx`.
+- PostgreSQL 18: `artifacts/paso26-f63100bfc31a4ee69f340d5112729b9d/paso26.trx`.
+- Respaldo/SQL/conteos: `artifacts/paso26-audit-dev-f32518942a594799ba871ad1c15cb8bc/`. Dump SHA256: `201D7A60C1BE17F4D86B804ED6D1A0FBE1DF394AE08C54F4814E2ABECA59550E`.
+- HTTPS real: `artifacts/paso26-audit-http-29aae799f01b4426b6bfdc31b218c92f/`; health 200, auditoría anónima 401 y correlación propia del servidor. Procesos temporales detenidos después.
+
+La [guía de auditoría local](Paso26_Auditoria_Local.md) contiene el inventario exacto de archivos, comandos y decisión física. Los rechazos tienen persistencia acotada a tres segundos; si falla se mantiene la denegación y se emite alarma operativa, sin prometer entrega duradera. Login/logout, 401/CSRF/model binding anteriores al servicio, cola duradera de seguridad, auditoría integral, retención, RLS y separación operativa completa de roles SQL siguen pendientes. Un propietario/superusuario puede alterar objetos; no se afirma inmutabilidad criptográfica.
+
+Se añadió `ci/Test-IdentityDocker.ps1` para repetir PostgreSQL 17 sin volúmenes existentes. Docker/PostgreSQL/Ollama habituales se conservan activos; las instancias temporales se eliminaron/detuvieron. **No hubo commit, push, merge ni modificación remota.** El siguiente módulo del orden validado es catálogos, capacidades y activos.
+
+# 23. Iteración 2 — catálogos, capacidades y activos (22-10-2026)
+
+Se implementaron `app.capability_catalog`, `app.organization_capabilities`, `app.assets` y `app.incident_categories`, con la nueva migración `20261022183846_CatalogsCapabilitiesAssets`. Las migraciones previas y el trabajo local permanecen preservados. Se incorporaron las ocho capacidades iniciales y PHISHING/ACCOUNT_COMPROMISE/RANSOMWARE como referencias versionadas, sin usuarios ni privilegios de negocio predeterminados.
+
+El perfil general devuelve Unknown/revisión 0 para capacidades no declaradas, sin insertar filas durante la lectura. Solo ORG_ADMIN cambia declaraciones. Restablecer Unknown conserva la revisión de la fila. Las referencias inactivas no aceptan nuevas modificaciones del perfil y conservan las declaraciones previas marcadas como inactivas.
+
+Se añadieron catálogos extensibles por PLATFORM_ADMIN y un inventario con creación, consulta, edición, retirada lógica y reactivación. Decisión conservadora de permisos de esta iteración: ORG_ADMIN escribe el inventario; Analyst/Viewer de la organización solo leen. No se deriva acceso a datos del tenant del rol global. Los códigos de referencia permanecen inmutables desde la API y no se borran físicamente; los activos conservan UUID e historia al retirarse. La criticidad del activo no determina automáticamente la severidad de un incidente.
+
+Las entidades nuevas usan UUID como PK, FK restrictivas, unicidad de org-capacidad, claves compuestas org-ID y revisiones positivas como tokens de concurrencia. Las escrituras comparten el advisory lock de Identity, releen permisos dentro de la transacción y guardan su auditoría SUCCESS de forma atómica. No se copian nombres, notas ni descripciones a los eventos. La paginación es acotada por skip/limit, con orden estable sin prometer una instantánea para cambios concurrentes.
+
+**Verificación:** Release sin errores/advertencias; 68/68 pruebas en PostgreSQL 17.11 y 68/68 en 18.3, sin omitidas. Son las 37 pruebas previas más 31 casos nuevos; se amplió también la prueba de cuenta SQL limitada existente. Se verificaron Unknown implícito, catálogo extensible/inactivo, roles, suspensión/revocación, aislamiento, claves compuestas reales, restricciones SQL, concurrencia forzada, revisiones, retirada, rollback por fallo de auditoría, CSRF, JSON con clasificación/precondiciones obligatorias y recuperación de la migración en base vacía desechable. EF no detecta cambios pendientes de modelo.
+
+La migración local se aplicó después de respaldar/restaurar la copia de `openirp_dev` en otro contenedor PostgreSQL 17 y cotejar sus conteos. Usuarios, organizaciones, membresías, concesiones y auditoría conservaron sus ceros. Hay ocho capacidades y tres categorías de referencia; declaraciones y activos permanecen vacíos.
+
+Evidencias bajo `D:\Desarrollos\OpenIRP`:
+
+- PG17: `artifacts/paso26-pg17-e46bc813f16e4ffba6f784810a0e8e46/paso26-pg17.trx`.
+- PG18: `artifacts/paso26-81c815f60bf0439a82899d62a4201944/paso26.trx`.
+- Respaldo/SQL/conteos: `artifacts/inventory-dev-ffb7a367c40545598553e4e6b241a909/`. Dump SHA256 `457A90BF6003D1524D3941D757225999770D6E5F2AEBA39A9920AB42B32151DA`.
+- HTTPS/OpenAPI real: `artifacts/inventory-http-dbd3fffada1041abaf9ccde3037e18e4/`; health 200, nuevos endpoints anónimos 401, esquema OpenAPI 200. Proceso temporal detenido después.
+
+La [guía de la Iteración 2](Iteracion2_Catalogos_Capacidades_Activos.md) detalla contratos, inventario de archivos y decisiones. Las asociaciones de activos y capacidades por incidente se implementarán con su agregado, conservando los snapshots históricos acordados. La fórmula de severidad sigue pendiente de definición antes de codificarla. RLS y separación operativa de roles SQL continúan pendientes del endurecimiento; no se cambiaron roles habituales, no se activó registro público y no se hicieron commit, push, merge ni cambios remotos.
+
+# 24. Iteración 3 — registro inicial de incidentes (local)
+
+El avance anterior de Identity, auditoría e inventario se guardó en el commit `d7ced5f213f343e01468eacc0679ccf3d50d289b` y se publicó, por autorización expresa del usuario, en `feature/paso26-identidad-organizaciones`. No hubo merge. Las afirmaciones anteriores sobre ausencia de commit/push corresponden al momento de ejecución de esas subfases. El desarrollo descrito en esta sección permanece local, posterior a ese commit.
+
+Se implementó una primera subfase de incidentes: registro, consulta/listado, corrección y asignación/desasignación justificada. ORG_ADMIN y ANALYST activos de la organización pueden escribir; VIEWER puede leer; PLATFORM_ADMIN no obtiene acceso organizacional implícito. El responsable debe ser una membresía activa ORG_ADMIN/ANALYST del mismo tenant, con cuenta activa y no bloqueada. Una suspensión posterior conserva referencias históricas sin conservar permisos.
+
+`app.incidents` mantiene la revisión actual; `app.incident_events` conserva un snapshot por revisión con actor, instante, motivo y correlación. Hay claves compuestas de organización para incidente y membresía, FK restrictivas, revisiones como token EF y protección append-only tanto en EF como por trigger SQL. El rol SQL limitado obtiene solo SELECT/INSERT en el historial. Los textos privados permanecen en el agregado/historial del tenant; la auditoría administrativa recibe solo identificadores y revisión.
+
+Las escrituras toman el mismo bloqueo transaccional de Identity, releen permisos y confirman incidente, snapshot y auditoría juntos. La API exige precondiciones explícitas; un cliente obsoleto recibe 409. La asignación nula debe aparecer expresamente en el JSON. No se habilitaron cambios de estado ni eliminación HTTP: esta entrega conserva `REGISTERED`. CIA, fórmula determinista de severidad, máximo histórico, respuesta, resolución, aprobaciones de cierre, asociaciones de activos y excepciones de capacidades por incidente siguen pendientes. No se presume severidad baja para lo aún no evaluado.
+
+**Verificación:** Release con cero errores/advertencias, EF sin cambios pendientes; 94/94 pruebas en PostgreSQL 17.11 y 94/94 en 18.3, sin fallidas ni omitidas. Son los 68 casos anteriores más 26 nuevos y la ampliación de permisos SQL runtime. Incluye concurrencia forzada de revisiones y revocación, aislamiento, snapshots, rollback frente a fallos de ambos historiales, inmutabilidad, HTTP/CSRF y contratos JSON.
+
+La migración `20261022192153_InitialIncidentRegister` se aplicó solo a la base local habitual después de respaldar y restaurar una copia en otro contenedor PostgreSQL 17. Los conteos anteriores se conservaron: cuentas/organizaciones/membresías/concesiones/auditoría/activos/declaraciones continúan en cero; ocho capacidades y tres categorías. Incidentes e historial comienzan vacíos; no se inventaron cuentas ni se modificaron roles SQL habituales.
+
+Evidencias bajo `D:\Desarrollos\OpenIRP`:
+
+- PG17: `artifacts/paso26-pg17-d8b0f6e0d9a447668651bdec8ac6b656/paso26-pg17.trx`.
+- PG18: `artifacts/paso26-142262e01c0840d2b433d0ec4eab067e/paso26.trx`.
+- Respaldo/SQL/conteos: `artifacts/incident-dev-7dd8764e670a42d9b22ab2e809b87ab9/`; dump SHA256 `BE868CA51C305358F4A7C0F20FF6A399F24B06ACE8744F563BB320DCAF643A28`.
+- HTTPS: `artifacts/incident-http-ba483fd3079f4029b717fe100f5fcfaf/`; health 200, nuevas rutas privadas anónimas 401, OpenAPI 200. Proceso propio detenido al terminar.
+
+La [guía de registro inicial de incidentes](Iteracion3_Registro_Incidentes.md) detalla rutas, contratos, archivos y límites. La inmutabilidad no protege frente a un propietario que altera objetos; RLS y separación operativa de credenciales siguen pendientes. Los snapshots por revisión dependen del protocolo de estos servicios, que también deberán respetar futuros escritores. Se mantiene la planificación completa de §7 para las siguientes subfases.
+
+# 25. Iteración 4 — activos afectados por incidente (local)
+
+Se añadió `app.incident_assets` con reporte de activos aún no inventariados, asociación directa desde inventario y vinculación posterior de un reporte. Un activo puede aparecer en varios incidentes; solo puede vincularse una vez dentro del mismo incidente. Reportes todavía no identificados pueden compartir nombre. La identidad procede del UUID, no del texto.
+
+Se conservan nombre, tipo, contexto y criticidad originales. La primera vinculación completa únicamente el UUID de inventario y su revisión; no reemplaza lo reportado con datos actuales. La criticidad desconocida se expresa como null explícito y no equivale a baja ni determina severidad. Cambios o retirada posteriores en inventario no alteran la historia. Nuevas asociaciones/vinculaciones requieren activo activo del tenant.
+
+ORG_ADMIN y ANALYST activos de la organización pueden operar; VIEWER lee; PLATFORM_ADMIN no obtiene bypass. Las FK compuestas vinculan organización-incidente y organización-activo. Hay índices para las FK, listado por tenant/incidente e índice único parcial para activo identificado. Toda escritura exige motivo y revisión vigente del incidente y participa de la misma transacción/bloqueo que Identity e inventario.
+
+`incident_events.details.asset` conserva el snapshot en cada operación ASSET_REPORTED/ASSET_ATTACHED/ASSET_LINKED; los eventos previos conservan sus valores con details vacío. La auditoría administrativa solo recibe revisión/UUID mínimos. Un fallo de cualquiera de los historiales revierte asociación y revisión. Un trigger SQL protege el reporte contra modificaciones, borrado y truncado, y permite solo la primera vinculación. El rol runtime limitado puede actualizar únicamente las columnas del vínculo, sin alterar el snapshot. No se cambiaron roles SQL habituales; las garantías de revisión/historial siguen requiriendo el protocolo de los servicios para futuros escritores y SQL directo.
+
+**Verificación:** Release sin errores/advertencias; 127/127 pruebas en PostgreSQL 17.11 y 127/127 en PostgreSQL 18.3, sin omitidas ni fallidas. Son 33 casos nuevos sobre los 94 existentes y una ampliación de la prueba runtime. Cubren snapshots históricos, criticidad desconocida, permisos/tenants, FK reales, unicidad, concurrencia forzada y retirada, fallos de ambos historiales para las tres operaciones, JSON/CSRF y protección SQL. Upgrade probado con eventos existentes; downgrade rechazado cuando perdería reportes del módulo. EF sin diferencias de modelo.
+
+Migración nueva `20261022194422_IncidentAssetSnapshots`, sin reescribir las cuatro anteriores. Se aplicó a `openirp_dev` después de respaldar/restaurar una copia en otro PostgreSQL 17 aislado y comparar conteos/historial. Los datos anteriores se conservaron: cuentas/organizaciones/membresías/concesiones/auditoría/activos/declaraciones/incidentes/historial en cero, ocho capacidades y tres categorías. La tabla nueva comienza vacía. Un error de nombres en el chequeo final del helper se corrigió y resolvió mediante verificación independiente de solo lectura, sin volver a migrar.
+
+Evidencias bajo `D:\Desarrollos\OpenIRP`:
+
+- PG17: `artifacts/paso26-pg17-b421678a926b49bea6df7e92026dde92/paso26-pg17.trx`.
+- PG18: `artifacts/paso26-f79ee6740b564729b9ce523a9caf4f9a/paso26.trx`.
+- Respaldo/SQL/conteos/restauración: `artifacts/incident-assets-dev-e60cbe94cd45401ba9f6e9f46d80ad5f/`. Dump SHA256 `960D7A8A5ADC5A44E2048D6567056BA51CE025FD4E27CD71BA6815F938E78A6C`; incluye `post-migration-verified.txt`.
+- HTTPS/OpenAPI: `artifacts/incident-assets-http-f2ef50acdf3f40ee9ce359391aa143d8/`; health 200, listado privado anónimo 401 y cuatro rutas nuevas en OpenAPI. Proceso temporal detenido.
+
+La [guía de activos afectados](Iteracion4_Activos_Incidente.md) contiene contratos, archivos y límites. Los cambios permanecen locales junto con el registro de incidentes anterior, sin nuevo commit/push/merge. El remoto conserva `d7ced5f`. RLS, credenciales operativas separadas, corrección auditable de vínculos, excepciones de capacidades, CIA y regla de severidad/ciclo de vida siguen pendientes. El propietario SQL puede alterar objetos; no se afirma protección criptográfica frente a él.
+
+# 26. Iteración 5 — capacidades y limitaciones por incidente (local)
+
+Se implementó `app.incident_capability_assessments` para conservar la decisión vigente de una capacidad dentro de un incidente, sin reescribir el perfil organizacional. ORG_ADMIN y ANALYST activos pueden evaluar/documentar limitaciones; VIEWER lee. Solo ORG_ADMIN modifica el perfil general; PLATFORM_ADMIN no tiene acceso organizacional implícito.
+
+**Decisión física y semántica:** se almacena un override nullable, limitaciones, motivo y revisión de la última evaluación; la disponibilidad efectiva se deriva del contexto vigente para evitar duplicar un perfil heredado que puede cambiar. `availability=null` hereda; `Unknown` explícito prevalece sobre un perfil Available. Las limitaciones son independientes y pueden acompañar la herencia. No se elimina la fila al restablecerla: conserva UUID y avanza la revisión. Catálogo inactivo fuerza Unknown/origen InactiveCatalog, conservando referencias e historia. Se prohíben nuevas evaluaciones explícitas sobre referencias inactivas, pero se permite restablecer herencia para retirar overrides anteriores.
+
+Los cambios del perfil actualizan en vivo las capacidades heredadas y no reescriben el historial del incidente. Las evaluaciones explícitas permanecen hasta ser revisadas. Cada PUT exige revisión del incidente, revisión de la declaración organizacional (cero si ausente) y revisión del catálogo, además del motivo; si cualquiera cambió, se rechaza el contexto obsoleto. El listado obtiene revisión y dependencias dentro de una instantánea REPEATABLE READ, con autorización revalidada y paginación acotada. Las páginas distintas no representan una exportación congelada.
+
+Toda escritura coordina con Identity/inventario mediante su mismo bloqueo y confirma decisión, revisión, historial y auditoría juntos. `incident_events.details.capability` conserva la entrada de catálogo, el perfil observado, override, limitaciones, origen y estado efectivo. El motivo se mantiene en el evento. La auditoría administrativa recibe metadatos mínimos del incidente y no copia el texto privado. Estos snapshots no sustituyen las futuras instantáneas completas de solicitudes de IA.
+
+FK compuesta organización-incidente, FK de capacidad, unicidad organización-incidente-capacidad e índices de FK. La revisión de evaluación es token EF. Triggers SQL protegen la identidad, exigen avance de revisión e impiden DELETE/TRUNCATE; el rol runtime limitado solo puede actualizar los campos de evaluación. SQL directo y futuros escritores siguen obligados a respetar el protocolo de revisión/historial. La garantía no protege frente a un propietario que altera objetos; RLS, granularidad del bloqueo y credenciales operativas separadas continúan pendientes.
+
+Nueva migración `20261022204102_IncidentCapabilityAssessments`; las cinco anteriores se conservaron. Upgrade probado con historia previa y downgrade rechazado cuando perdería decisiones/eventos nuevos. **Verificación:** Release sin errores/advertencias; 156/156 pruebas en PostgreSQL 17.11 y 156/156 en PostgreSQL 18.3, cero fallidas/omitidas. Son 29 casos nuevos sobre los 127 previos y la ampliación del caso SQL runtime. EF sin diferencias pendientes. Se verificaron herencia, Unknown explícito, precondiciones, aislamiento/permisos, concurrencia forzada frente a perfil/catálogo, rollback de ambos historiales, Unicode máximo, JSON/CSRF e integridad SQL.
+
+Se aplicó la migración solo a `openirp_dev` después de respaldar/restaurar una copia aislada y comparar conteos/historial. Los conteos anteriores permanecieron en cero para identidades/organizaciones/membresías/concesiones/auditoría/activos/declaraciones/incidentes/eventos/asociaciones; se conservan ocho capacidades y tres categorías. Evaluaciones nuevas en cero, ambos triggers activos. No se crearon cuentas de negocio ni roles SQL en el cluster habitual. Docker Desktop estaba detenido; se inició para recuperar PostgreSQL 17. El servicio PostgreSQL 18 del sistema no se modificó.
+
+Evidencias bajo `D:\Desarrollos\OpenIRP`:
+
+- PG17: `artifacts/paso26-pg17-17fe2143645645549af752bfaffb85b6/paso26-pg17.trx`.
+- PG18: `artifacts/paso26-f59bbe65ee684c099c1125f150f5c4a4/paso26.trx`.
+- Respaldo/SQL/conteos/restauración/triggers: `artifacts/incident-capabilities-dev-f4287cbca0f4488aacc578eb05c56d5b/`. Dump SHA256 `560C39E26F6BB696D33CD253E4D4E90E85490829B164EC41550E42F4C39999B1`.
+- HTTPS/OpenAPI: `artifacts/incident-capabilities-http-1b6e121c13ea433d99e95a5cb78a29f8/`; health 200, listado privado anónimo 401 y rutas nuevas presentes. Proceso de comprobación detenido.
+
+La [guía de capacidades por incidente](Iteracion5_Capacidades_Incidente.md) contiene contratos, archivos y límites. Los cambios siguen locales junto con las subfases anteriores pendientes, sin nuevo commit/push/merge. CIA, regla determinista de severidad, ciclo de vida completo y aprobaciones siguen pendientes; no se calculó una severidad arbitraria ni se habilitaron registro público, bypass global o acciones remotas sobre activos.
+
+# 27. Iteración 6 — evaluación CIA y propuesta de severidad (23-10-2026)
+
+Se implementaron confidentiality_impact, integrity_impact y availability_impact, nullable, en el incidente y sus eventos. None/Low/Medium/High son valores explícitos; NULL representa sin evaluar. Las tres dimensiones deben aparecer en el PUT, aunque sean null. La bandera isImpactAssessmentComplete indica que las tres fueron evaluadas, sin inferir severidad ni autorizar cierre. El estado del incidente sigue REGISTERED en esta subfase.
+
+ORG_ADMIN y ANALYST activos del tenant pueden evaluar, corregir o devolver dimensiones a null con motivo y revisión vigente. VIEWER lee y PLATFORM_ADMIN no obtiene bypass organizacional. La transacción/bloqueo compartido revalida permisos y confirma las tres dimensiones, revisión, historial y auditoría juntos. Se conservan los valores CIA vigentes en todos los eventos posteriores, incluidas modificaciones de activos/capacidades/asignación. Los eventos anteriores siguen null, sin evaluación retroactiva. Auditoría global conserva metadatos mínimos, sin motivo privado.
+
+Nueva migración `20261023032311_IncidentImpactAssessment`, preservando las seis anteriores. Añade seis columnas nullable sin DEFAULT y checks de enumeración; amplía la acción IMPACT_ASSESSED. La protección append-only del historial se conserva. El downgrade rechaza pérdida de evaluaciones actuales o históricas, incluso cuando la evaluación vigente volvió a null.
+
+**Validación final:** 181/181 pruebas correctas en PostgreSQL 17.11 y 181/181 en PostgreSQL 18.3, cero fallidas/omitidas; Release sin errores/advertencias y EF sin diferencias pendientes. Son 25 casos nuevos sobre los 156 anteriores y la ampliación del caso runtime SQL. Se verificaron null/None, niveles CIA, parcialidad/reset, snapshots comunes, permisos/tenants, contextos inactivos, precondiciones, concurrencia forzada, rollback de ambos historiales, integridad SQL, HTTP/CSRF, upgrade y downgrade protegido. El primer ensayo detectó una lectura doble del stream en una prueba HTTP; se corrigió la prueba y se repitió la suite completa con éxito.
+
+Se respaldó/restauró una copia de openirp_dev antes de aplicar la migración local. Los conteos anteriores se conservaron: datos de negocio/identidad/auditoría/incidentes/contexto en cero, ocho capacidades y tres categorías. Se comprobaron las seis columnas nullable y los checks/protección del historial. No se crearon identidades de negocio ni roles SQL en el cluster habitual.
+
+Evidencias bajo `D:\Desarrollos\OpenIRP`:
+
+- PG17: `artifacts/paso26-pg17-a875949ae95a4505b75285cf250b10ae/paso26-pg17.trx`.
+- PG18: `artifacts/paso26-20c37bc4411e44059ee03631cd303af9/paso26.trx`.
+- Respaldo/SQL/conteos/restauración: `artifacts/incident-impact-dev-67c3b4aaae204b71a91d533979e20c02/`. Dump SHA256 `429B5325C5E4E35C3B55EBAC12B3756BBD17574D97C8F5FC86B814122F1A58B8`.
+- HTTPS/OpenAPI: `artifacts/incident-impact-http-e4d4b0381211436eacdd57e9680535fd/`; health 200, PUT CIA anónimo 401 y ruta documentada. Proceso propio detenido.
+
+La [guía CIA](Iteracion6_Evaluacion_CIA.md) enumera contratos y archivos. También se redactó una [propuesta explícita de severidad v1](Propuesta_Regla_Severidad_v1.md): umbrales ordenados por CIA, criticidad evaluada, alcance y afectación operacional; versión de regla y tratamiento del máximo histórico. El vocabulario CIA tiene referencias primarias NIST, pero los umbrales son una propuesta propia de OpenIRP y no se presentan como equivalencia normativa ni validación empírica.
+
+El prototipo matemático aislado pasó 3072 combinaciones completas, 12800 comparaciones de monotonicidad, seis casos de entrada desconocida y 14 escenarios. Evidencia: `artifacts/severity-proposal-fa6ccb7aec6040c0b0a11ccabf19e88c/`. Está fuera de la API y deja activatedInApi=false; esos casos no se suman a las 181 pruebas de integración. El usuario confirmó el 23 de octubre de 2026 Pending estricto y severity=null mientras falte cualquier entrada requerida, sin severidad provisional. Una evaluación actual Pending no borrará el máximo histórico ya calculado y no habilitará cierre. Esta decisión no activa el motor; siguen pendientes la validación de umbrales/operación, criticidad reevaluada e inicialización del máximo histórico antes de activarlo.
+
+Los cambios continúan locales, sin nuevo commit/push/merge. Severidad actual/máxima, alcance/afectación operacional, ciclo de vida completo y aprobaciones continúan pendientes; RLS y credenciales operativas separadas siguen en endurecimiento. No se habilitaron registro público, permisos globales de tenant ni acciones remotas sobre dispositivos.

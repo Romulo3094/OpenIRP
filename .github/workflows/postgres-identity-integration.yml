@@ -1,0 +1,58 @@
+name: PostgreSQL Identity integration
+
+on:
+  push:
+    branches: [feature/paso26-identidad-organizaciones]
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  verify-identity-schema:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: openirp_ci
+          POSTGRES_USER: openirp_ci
+          POSTGRES_PASSWORD: ci_ephemeral_not_a_production_secret
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U openirp_ci -d openirp_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      OPENIRP_TEST_POSTGRES: Host=127.0.0.1;Port=5432;Database=postgres;Username=openirp_ci;Password=ci_ephemeral_not_a_production_secret
+      ConnectionStrings__OpenIRP: Host=127.0.0.1;Port=5432;Database=openirp_ci;Username=openirp_ci;Password=ci_ephemeral_not_a_production_secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Install dotnet-ef
+        run: dotnet tool install --global dotnet-ef --version 10.0.5
+      - name: Restore
+        run: dotnet restore apps/api/OpenIRP.slnx
+      - name: Build
+        run: dotnet build apps/api/OpenIRP.slnx --no-restore --configuration Release
+      - name: Apply EF migrations to temporary PostgreSQL
+        run: |
+          dotnet ef database update \
+            --project apps/api/OpenIRP.Infrastructure/OpenIRP.Infrastructure.csproj \
+            --startup-project apps/api/OpenIRP.Api/OpenIRP.Api.csproj \
+            --context OpenIrpDbContext \
+            --configuration Release --no-build
+      - name: Verify PostgreSQL constraints
+        run: |
+          docker run --rm --network host \
+            -e PGPASSWORD=ci_ephemeral_not_a_production_secret \
+            -v "$PWD/ci:/ci:ro" postgres:17 \
+            psql -h 127.0.0.1 -U openirp_ci -d openirp_ci \
+            -v ON_ERROR_STOP=1 -f /ci/verify-identity-schema.sql
+      - name: Verify transactional Identity services and HTTP authorization
+        run: dotnet test apps/api/OpenIRP.IntegrationTests --configuration Release --no-build --logger trx

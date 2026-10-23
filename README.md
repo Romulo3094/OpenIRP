@@ -80,7 +80,7 @@ Las siguientes capacidades forman parte de la propuesta de desarrollo. Su dispon
 
 ### Ejecución guiada
 
-- Presentación secuencial de las acciones recomendadas.
+- Ejecución flexible de tareas con dependencias explícitas entre pasos, sin exigir un orden estrictamente secuencial.
 - Identificación de responsables.
 - Registro del avance de los procedimientos.
 - Confirmación humana de las acciones realizadas.
@@ -108,7 +108,7 @@ La solución se concibe a partir de los siguientes componentes:
 5. **Servicio de IA local:** asistencia para adaptar y explicar procedimientos.
 6. **Validación humana:** revisión y aceptación de las recomendaciones antes de su utilización.
 
-La arquitectura técnica definitiva y las tecnologías específicas de implementación se documentarán conforme avance el desarrollo.
+La arquitectura técnica está especificada en [el documento maestro](OpenIRP_Documentacion/OpenIRP_Planificacion_Integral.md): solución .NET 10 en cuatro proyectos, PostgreSQL 17, contenedores Docker y Ollama local. Su implementación será incremental.
 
 ## Despliegue
 
@@ -116,7 +116,61 @@ OpenIRP contempla un despliegue basado en contenedores Docker, con el objetivo d
 
 Para las funcionalidades de inteligencia artificial se considera el uso de Ollama como servicio de inferencia local.
 
-Los requisitos de hardware, archivos de configuración, dependencias y procedimientos de instalación serán documentados y publicados cuando se encuentre disponible una versión reproducible del prototipo.
+La base del entorno de desarrollo usa PostgreSQL 17 y Ollama mediante Docker Compose. Para preparar el entorno local, copia `infra/.env.example` a `infra/.env` y cambia `POSTGRES_PASSWORD`. Antes de ejecutar Compose, crea el volumen externo con `docker volume create openirp_ollama_data`; desde la carpeta `infra`, ejecuta `docker compose up -d`. Se requiere Docker con acceso a GPU NVIDIA para la configuración actual de Ollama (`gpus: all`). El modelo de IA debe descargarse por separado.
+
+Para la API, configura la conexión sin subir secretos: `dotnet user-secrets set "ConnectionStrings:OpenIRP" "Host=127.0.0.1;Port=5433;Database=openirp_dev;Username=openirp;Password=TU_PASSWORD" --project apps/api/OpenIRP.Api`. Después ejecuta `dotnet run --project apps/api/OpenIRP.Api`. La configuración de desarrollo usa el puerto HTTP `5195` y HTTPS `7113` (consulta `launchSettings.json`). El endpoint `/api/health` responde de forma estática y todavía no comprueba la conectividad con PostgreSQL ni Ollama.
+
+**Estado:** la infraestructura inicial y la capa Identity están en desarrollo. La migración `InitialIdentityOrganizations` está generada y fue aplicada y verificada sobre PostgreSQL 17 temporal en GitHub Actions. **La base local `openirp_dev` fue respaldada y migrada después de comprobar que estaba vacía; el respaldo se restauró con éxito en un contenedor separado.** El aprovisionamiento offline del primer administrador, el alta transaccional de organizaciones y la protección del último administrador ya están implementados localmente, con pruebas PostgreSQL y HTTP. Consulta [la guía del Paso 26](OpenIRP_Documentacion/Paso26_Administracion_Local.md) para repetirlas y preparar tu entorno persistente.
+
+**Migración en la base habitual (revisar destino y respaldo primero):** además del secreto para arrancar la API, la factoría de EF Core necesita `ConnectionStrings__OpenIRP` como variable de entorno durante `dotnet ef database update`. En PowerShell configura esa variable solo en la sesión actual y usa:
+
+```powershell
+dotnet tool install --global dotnet-ef --version 10.0.5
+dotnet ef database update --project apps/api/OpenIRP.Infrastructure/OpenIRP.Infrastructure.csproj --startup-project apps/api/OpenIRP.Api/OpenIRP.Api.csproj --context OpenIrpDbContext
+Remove-Item Env:\ConnectionStrings__OpenIRP
+```
+
+No apliques la migración a bases con datos existentes sin revisar antes el script y su respaldo; la conexión deberá apuntar al entorno de desarrollo deseado.
+
+### Auditoría administrativa local
+
+La subfase siguiente del Paso 26 incorpora eventos transaccionales, consultas de auditoría con permisos por organización y protección append-only. La migración `BasicAdministrativeAudit` ya fue aplicada a `openirp_dev` con respaldo/restauración comprobados y sin alterar los datos de negocio. La validación de esa subfase pasó 37/37 casos tanto en PostgreSQL 17 como en 18.
+
+Consulta [la guía de auditoría](OpenIRP_Documentacion/Paso26_Auditoria_Local.md) para ver endpoints, permisos SQL, archivos y límites. Para repetir con Docker usa `./ci/Test-IdentityDocker.ps1`; para PostgreSQL nativo, `./ci/Test-IdentityLocal.ps1`. No se habilitó registro público ni acceso global a tenants.
+
+### Catálogos, capacidades e inventario local
+
+La Iteración 2 incorpora catálogos de capacidades/categorías, perfil organizacional con UNKNOWN implícito y activos con revisión y retirada lógica. Los permisos se comprueban por organización y las escrituras se auditan dentro de su transacción. La migración local se aplicó tras respaldo y restauración de prueba, conservando los datos previos.
+
+La validación de esa subfase pasó 68/68 casos en PostgreSQL 17 y 68/68 en PostgreSQL 18. Consulta [contratos, permisos, archivos y evidencias](OpenIRP_Documentacion/Iteracion2_Catalogos_Capacidades_Activos.md). Puedes iniciar la API con `./ci/Start-LocalApi.ps1`; los nuevos endpoints aparecen en OpenAPI de desarrollo.
+
+### Registro inicial de incidentes local
+
+La Iteración 3 agrega registro, consulta, corrección y asignación de incidentes, con historial inmutable por revisión y auditoría transaccional. ORG_ADMIN/ANALYST activos pueden escribir en su organización; VIEWER lee. El permiso global no evita la membresía del tenant. Las revisiones obsoletas se rechazan con 409.
+
+La migración `InitialIncidentRegister` está aplicada en `openirp_dev` tras respaldar y restaurar una copia aislada, conservando datos previos. La validación de esa subfase pasó **94/94 pruebas en PostgreSQL 17 y 94/94 en PostgreSQL 18**, sin omitidas. Consulta [rutas, contratos, archivos y evidencias](OpenIRP_Documentacion/Iteracion3_Registro_Incidentes.md).
+
+Esta subfase conserva el estado REGISTERED: evaluación CIA, severidad, respuesta y cierre siguen pendientes de la regla determinista y sus controles. No se asigna severidad baja por omisión. El avance previo se publicó en `d7ced5f`; los cambios de incidentes permanecen locales, posteriores a ese commit.
+
+### Activos afectados por incidente
+
+La Iteración 4 permite reportar activos todavía no inventariados, adjuntar activos existentes y vincularlos después conservando nombre, tipo, contexto y criticidad históricos. Cada operación exige motivo y revisión del incidente, con permisos por organización, snapshots y auditoría transaccionales. La criticidad desconocida debe expresarse como null, sin asumir un nivel bajo.
+
+La nueva migración está aplicada en la base local tras respaldo y restauración aislada verificados. Validación de esa subfase: **127/127 pruebas en PostgreSQL 17 y 127/127 en PostgreSQL 18**. Consulta [endpoints, archivos, evidencia y pendientes](OpenIRP_Documentacion/Iteracion4_Activos_Incidente.md). Los cambios nuevos de incidentes y asociaciones siguen locales, sin otro commit/push.
+
+### Capacidades y limitaciones por incidente
+
+La Iteración 5 permite heredar el perfil de la organización o evaluar disponibilidad específica del incidente, con motivo, limitaciones e historial. Unknown explícito es distinto de heredar. Se comprueban las revisiones del incidente, perfil y catálogo para rechazar decisiones basadas en contexto obsoleto. ANALYST puede documentar el incidente; el perfil general sigue reservado a ORG_ADMIN.
+
+Migración local aplicada tras respaldo y restauración de prueba, conservando los datos previos. Validación de esa subfase: **156/156 pruebas en PostgreSQL 17 y 156/156 en PostgreSQL 18**, sin fallidas ni omitidas. Consulta [endpoints, archivos y evidencias](OpenIRP_Documentacion/Iteracion5_Capacidades_Incidente.md). Los cambios continúan locales sin nuevo commit/push; CIA, regla de severidad y ciclo de vida completo siguen pendientes.
+
+### Evaluación de impacto CIA
+
+La Iteración 6 permite evaluar confidencialidad, integridad y disponibilidad con None/Low/Medium/High o null explícito cuando falta investigar. Exige motivo y revisión, protege datos por organización y conserva CIA en el historial de todas las modificaciones posteriores. No deriva severidad ni autoriza cierre automáticamente.
+
+Migración local aplicada tras respaldo/restauración verificados, conservando datos previos. Suite actual: **181/181 pruebas en PostgreSQL 17 y 181/181 en PostgreSQL 18**, sin fallidas ni omitidas. Consulta [archivos, endpoints y evidencias CIA](OpenIRP_Documentacion/Iteracion6_Evaluacion_CIA.md).
+
+La [propuesta de severidad v1](OpenIRP_Documentacion/Propuesta_Regla_Severidad_v1.md) incluye una matriz comprobada en un prototipo matemático aislado, todavía sin activar en la API. La política de desconocidos está confirmada: Pending y severity=null hasta completar todas las entradas requeridas, sin severidad provisional. Los umbrales siguen sujetos a revisión. Los cambios de desarrollo continúan locales, sin nuevo commit/push.
 
 ## Alcance y limitaciones
 
