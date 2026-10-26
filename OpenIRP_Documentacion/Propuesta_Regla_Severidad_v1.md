@@ -1,6 +1,6 @@
 # Propuesta de regla determinista de severidad — OpenIRP v1
 
-Estado: **propuesta para revisión, sin motor activado ni campos de severidad escritos por la API**. Fecha: 23 de octubre de 2026. Complementa §7.2 de la planificación; no sustituye silenciosamente una decisión de negocio pendiente. La evaluación CIA de la Iteración 6 puede usarse sin adoptar esta matriz.
+Estado: **matriz v1 adoptada por el usuario para el MVP el 23 de octubre de 2026**. Su implementación versionada, activación y pruebas se documentan en la [Iteración 9](Iteracion9_Severidad_Incidente.md). Complementa §7.2 de la planificación. Los umbrales siguen sujetos a evaluación con casos reales, sin afirmar calibración empírica.
 
 ## Referencia y alcance
 
@@ -8,14 +8,14 @@ FIPS 199 trata la categorización de información/sistemas según impacto potenc
 
 El glosario NIST distingue efectos limitados, serios y severos/catastróficos sobre operaciones, activos o personas. La correspondencia interna Low/Medium/High y el uso adicional de None pertenecen a los contratos de OpenIRP; no se afirma equivalencia normativa completa. [NIST: impacto potencial](https://csrc.nist.gov/glossary/term/potential_impact).
 
-## Entradas propuestas para la futura clasificación
+## Entradas de la clasificación v1
 
 - CIA: tres dimensiones explícitas None/Low/Medium/High; null sigue significando sin evaluar.
 - Criticidad de los activos afectados: Low/Medium/High, o NotApplicable cuando el analista confirma justificadamente que no corresponde una criticidad de activo. Desconocida permanece null. Debe conservarse la evidencia y los UUID/revisiones del contexto consultado.
 - Alcance: Single (un recurso/ámbito acotado), Multiple (varios recursos/usuarios o servicios) y OrganizationWide (afectación transversal confirmada). null indica desconocido. Son categorías del alcance observado, no una cuenta automática de filas de inventario.
 - Afectación operacional: None (sin degradación identificada), Degraded (funciones degradadas pero sostenidas), MajorInterruption (interrupción de una función principal con contingencia disponible), CriticalInterruption (imposibilidad de sostener una función principal sin contingencia viable). null indica desconocido. No se fijan minutos ni porcentajes sin datos de una pyme piloto.
 
-Solo CIA está implementado actualmente. Criticidad evaluada, alcance y afectación operacional de esta propuesta requieren contratos, persistencia, snapshots y pruebas en la próxima subfase. No deben inferirse automáticamente de la categoría PHISHING/RANSOMWARE ni del número de asociaciones de activos.
+CIA está implementado en la Iteración 6; alcance y afectación operacional se incorporan en la [Iteración 7](Iteracion7_Contexto_Incidente.md), con contratos, persistencia y snapshots. La [criticidad evaluada de la Iteración 8](Iteracion8_Criticidad_Incidente.md) incorpora una decisión explícita separada del reporte original, justificación de reducciones e invalidación al cambiar los activos. Las entradas ya tienen contratos y persistencia; el cálculo se incorpora en la Iteración 9. No deben inferirse automáticamente de la categoría PHISHING/RANSOMWARE ni del número de asociaciones de activos.
 
 Los snapshots originales de incident_assets son inmutables: una criticidad reportada desconocida no puede resolverse sobrescribiendo ese reporte. La clasificación futura deberá registrar una evaluación de criticidad justificada y versionada aparte de la observación original. Tampoco debe usar un valor menor que una criticidad High conocida sin documentar y conservar esa reevaluación. Las dependencias deben corresponder a una revisión coherente del incidente y su contexto.
 
@@ -23,9 +23,9 @@ Los snapshots originales de incident_assets son inmutables: una criticidad repor
 
 Decisión del usuario confirmada el 23 de octubre de 2026: si falta cualquier entrada requerida, la clasificación queda Pending y `severity=null`; nunca se sustituye null por None/Low ni por cero. Esto indica falta de evaluación suficiente. Pending no equivale a baja prioridad: una interrupción crítica conocida o una dimensión High debe resaltarse para revisión inmediata aunque falten otros datos. No se habilitará cierre con evaluación pendiente.
 
-Se adopta Pending estricto: incluso con evidencia conocida High/Critical, no se asignará una severidad provisional mientras falte alguna entrada requerida. Esta decisión cierra la elección de política para datos desconocidos; los umbrales de la matriz continúan pendientes de validación. La cola/alerta de revisión urgente también es futura y no se presenta como implementada.
+Se adopta Pending estricto: incluso con evidencia conocida High/Critical, no se asignará una severidad provisional mientras falte alguna entrada requerida. Esta decisión cierra la elección de política para datos desconocidos; los umbrales se adoptaron como política inicial del MVP y siguen sujetos a evaluación con casos reales. La cola/alerta de revisión urgente también es futura y no se presenta como implementada.
 
-## Matriz propuesta para entradas completas
+## Matriz adoptada para entradas completas
 
 Sea M el mayor impacto CIA observado; orden None < Low < Medium < High. Se evalúan estas reglas en orden y se toma la primera que corresponda:
 
@@ -40,7 +40,7 @@ NotApplicable no satisface los predicados de criticidad High; no se transforma e
 
 El mayor nivel CIA evita que sumar dimensiones sin impacto diluya una dimensión High. Criticidad y alcance escalan mediante reglas explícitas; no se utiliza una suma ponderada sin calibración. Para entradas conocidas, subir una entrada en los órdenes CIA/criticidad/alcance/operación no puede reducir la clasificación. Ese comportamiento se verificó en el prototipo matemático aislado descrito más abajo; deberá mantenerse al implementar el motor y sus contratos.
 
-## Casos de aceptación propuestos
+## Casos de aceptación de la matriz v1
 
 | CIA C/I/A | Criticidad | Alcance | Operación | Resultado base esperado |
 |---|---|---|---|---|
@@ -71,12 +71,12 @@ Evidencia local ignorada por Git: `artifacts/severity-proposal-fa6ccb7aec6040c0b
 
 ## Máximo histórico, versionado y cierre
 
-Cuando se implemente una política acordada, cada clasificación conservará versión de regla, entradas, resultado, revisión y motivo. `maximum_severity_reached` solo aumentará a partir de clasificaciones efectivamente calculadas; no se borrará si la evaluación actual vuelve a Pending. Cambiar la versión de regla requerirá una reevaluación explícita, no reescribir eventos pasados.
+La clasificación implementada en la Iteración 9 conserva versión de regla, entradas, resultado, revisión y motivo del evento. `maximum_severity_reached` solo aumentará a partir de clasificaciones efectivamente calculadas; no se borrará si la evaluación actual vuelve a Pending. Cambiar la versión de regla requerirá una reevaluación explícita, no reescribir eventos pasados.
 
-Incidentes con evidencia CIA previa a la activación necesitarán revisión documentada: esa historia existe, pero no se afirmará que una severidad fue calculada por una regla que entonces no estaba activa. La política de inicialización del máximo histórico para datos ya existentes debe definirse antes de desplegar el motor; las bases de negocio locales siguen vacías en la evidencia de esta iteración.
+Incidentes con evidencia CIA previa a la activación necesitarán revisión documentada: esa historia existe, pero no se afirmará que una severidad fue calculada por una regla que entonces no estaba activa. El usuario aprobó iniciar el máximo histórico de incidentes anteriores desde su primera clasificación explícita y confirmada, sin atribuir severidades a eventos antiguos. Las bases de negocio locales siguen vacías en la evidencia de esta iteración.
 
 El cierre de un incidente que alcanzó High/Critical mantendrá la aprobación ORG_ADMIN vinculada a la revisión y sus reglas de invalidación. La evaluación CIA por sí sola no habilita cierre, no cambia estados ni permite al cliente escribir severity/maximumSeverityReached. La autoaprobación excepcional y justificada sigue siendo una decisión distinta.
 
 ## Revisión pendiente
 
-Antes de activar el motor: acordar umbrales, definiciones de alcance/operación, cómo documentar criticidad reevaluada y cómo inicializar el máximo de incidentes preexistentes. Después: verificar exhaustivamente fronteras, monotonicidad, revisiones, snapshots, máximo histórico y bloqueo/invalidation de aprobaciones de cierre.
+La matriz v1 y la inicialización explícita del máximo fueron adoptadas por el usuario para el MVP. La Iteración 9 verifica el evaluador, sus fronteras/monotonicidad, revisiones, snapshots y máximo histórico. Quedan la evaluación empírica con casos reales y las transiciones/aprobaciones de cierre con sus reglas de invalidación. El resultado activatedInApi=false del prototipo aislado es evidencia histórica de aquel ensayo; no describe el estado posterior de la API.

@@ -21,6 +21,39 @@ BEGIN
     EXECUTE format('GRANT USAGE ON SCHEMA auth, app TO %I', runtime_name);
     EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA auth, app TO %I', runtime_name);
     EXECUTE format('GRANT USAGE ON ALL SEQUENCES IN SCHEMA auth, app TO %I', runtime_name);
+    IF to_regclass('app.playbooks') IS NOT NULL THEN
+        EXECUTE format('REVOKE ALL ON TABLE app.playbooks, app.playbook_versions FROM %I', runtime_name);
+        EXECUTE format('GRANT SELECT, INSERT ON TABLE app.playbooks, app.playbook_versions TO %I', runtime_name);
+        EXECUTE format('GRANT UPDATE (title, category_id, revision, current_published_version_id) ON TABLE app.playbooks TO %I', runtime_name);
+        EXECUTE format('GRANT UPDATE (title, category_id, objective, instructions, status, review_request_id, submitted_by_user_id, published_at) ON TABLE app.playbook_versions TO %I', runtime_name);
+        EXECUTE format('REVOKE ALL ON TABLE app.playbook_steps, app.playbook_step_dependencies, app.playbook_capability_requirements FROM %I', runtime_name);
+        EXECUTE format('GRANT SELECT, INSERT, DELETE ON TABLE app.playbook_steps, app.playbook_step_dependencies, app.playbook_capability_requirements TO %I', runtime_name);
+    END IF;
+    IF to_regclass('app.playbook_executions') IS NOT NULL THEN
+        EXECUTE format('REVOKE ALL ON TABLE app.playbook_executions, app.execution_tasks, app.execution_task_events FROM %I', runtime_name);
+        EXECUTE format('GRANT SELECT, INSERT ON TABLE app.playbook_executions, app.execution_tasks, app.execution_task_events TO %I', runtime_name);
+        EXECUTE format('GRANT UPDATE (status, revision, finished_at, finish_reason) ON TABLE app.playbook_executions TO %I', runtime_name);
+        EXECUTE format('GRANT UPDATE (status, assigned_membership_id, changed_at_revision) ON TABLE app.execution_tasks TO %I', runtime_name);
+    END IF;
+    IF to_regclass('app.evidence_files') IS NOT NULL THEN
+        EXECUTE format('REVOKE ALL ON TABLE app.evidence_files, app.evidence_file_events FROM %I', runtime_name);
+        EXECUTE format('GRANT SELECT, INSERT ON TABLE app.evidence_files, app.evidence_file_events TO %I', runtime_name);
+        EXECUTE format('GRANT UPDATE (state, revision, changed_at, failure_code) ON TABLE app.evidence_files TO %I', runtime_name);
+    END IF;
+    IF to_regclass('app.incident_evidence') IS NOT NULL THEN
+        EXECUTE format('REVOKE ALL ON TABLE app.incident_evidence, app.evidence_events FROM %I', runtime_name);
+        EXECUTE format('GRANT SELECT, INSERT ON TABLE app.incident_evidence, app.evidence_events TO %I', runtime_name);
+        EXECUTE format('GRANT UPDATE (status, revision, withdrawn_by_user_id, withdrawn_at, withdrawal_reason) ON TABLE app.incident_evidence TO %I', runtime_name);
+        EXECUTE format('GRANT UPDATE (completion_evidence_id) ON TABLE app.execution_tasks TO %I', runtime_name);
+    END IF;
+    IF to_regclass('app.step_approvals') IS NOT NULL THEN
+        EXECUTE format('REVOKE ALL ON TABLE app.step_approvals FROM %I', runtime_name);
+        EXECUTE format('GRANT SELECT, INSERT ON TABLE app.step_approvals TO %I', runtime_name);
+    END IF;
+    IF to_regclass('app.playbook_reviews') IS NOT NULL THEN
+        EXECUTE format('REVOKE ALL ON TABLE app.playbook_reviews FROM %I', runtime_name);
+        EXECUTE format('GRANT SELECT, INSERT ON TABLE app.playbook_reviews TO %I', runtime_name);
+    END IF;
     IF to_regclass('app.incident_capability_assessments') IS NOT NULL THEN
         EXECUTE format('REVOKE ALL ON TABLE app.incident_capability_assessments FROM %I', runtime_name);
         EXECUTE format('GRANT SELECT, INSERT ON TABLE app.incident_capability_assessments TO %I', runtime_name);

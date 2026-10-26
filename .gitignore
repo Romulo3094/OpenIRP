@@ -80,3 +80,6 @@ docker-compose.override.yml
 models/
 *.gguf
 *.safetensors
+
+# Private operational evidence storage
+.openirp-data/

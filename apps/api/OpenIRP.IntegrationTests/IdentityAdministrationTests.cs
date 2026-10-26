@@ -24,13 +24,13 @@ public sealed partial class IdentityAdministrationTests : IAsyncLifetime
     private const string Password = "Only-For-Tests!2026";
     private static NewAccount Account(string name) => new($"{name}@example.test", Password);
 
-    private sealed class TestApplication(string connection) : WebApplicationFactory<Program>
+    private sealed class TestApplication(string connection, string? evidenceRoot = null) : WebApplicationFactory<Program>
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseEnvironment("Testing");
             builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(
-                new Dictionary<string, string?> { ["ConnectionStrings:OpenIRP"] = connection }));
+                new Dictionary<string, string?> { ["ConnectionStrings:OpenIRP"] = connection, ["EvidenceFiles:RootPath"] = evidenceRoot }));
             builder.ConfigureLogging(logging => logging.ClearProviders());
         }
     }

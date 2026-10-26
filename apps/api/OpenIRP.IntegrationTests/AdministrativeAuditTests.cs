@@ -288,6 +288,45 @@ public sealed partial class IdentityAdministrationTests
                 var latest = (await incidents.EventsAsync(administrator, organization.Id, registered.Id)).Items.Last();
                 Assert.Equal(ImpactLevel.High, latest.ConfidentialityImpact);
                 Assert.Equal(13, await db.AuditEvents.CountAsync());
+                await incidents.AssessContextAsync(administrator, organization.Id, registered.Id,
+                    new(IncidentScope.Multiple, OperationalImpact.Degraded, "Runtime context", 8));
+                await incidents.UpdateAsync(administrator, organization.Id, registered.Id,
+                    new(category, "Context preserved", null, "Title correction", 9));
+                var contextSnapshot = (await incidents.EventsAsync(administrator, organization.Id, registered.Id)).Items.Last();
+                Assert.Equal(IncidentScope.Multiple, contextSnapshot.Scope);
+                Assert.Equal(OperationalImpact.Degraded, contextSnapshot.OperationalImpact);
+                Assert.Equal(ImpactLevel.High, contextSnapshot.ConfidentialityImpact);
+                Assert.Equal(15, await db.AuditEvents.CountAsync());
+                await incidents.AssessCriticalityAsync(administrator, organization.Id, registered.Id,
+                    new(IncidentCriticality.High, null, "Runtime criticality", 10));
+                await incidents.UpdateAsync(administrator, organization.Id, registered.Id,
+                    new(category, "Criticality preserved", null, "Title correction", 11));
+                var criticalitySnapshot = (await incidents.EventsAsync(administrator, organization.Id, registered.Id)).Items.Last();
+                Assert.Equal(IncidentCriticality.High, criticalitySnapshot.AssessedCriticality);
+                Assert.Equal(11, criticalitySnapshot.CriticalityAssessedAtRevision);
+                Assert.Equal(17, await db.AuditEvents.CountAsync());
+                var classified = await incidents.AssessSeverityAsync(administrator, organization.Id, registered.Id,
+                    new("Runtime classification", 12));
+                Assert.Equal(IncidentSeverity.Critical, classified.Severity);
+                Assert.Equal(IncidentSeverity.Critical, classified.MaximumSeverityReached);
+                Assert.Equal(18, await db.AuditEvents.CountAsync());
+                var lowerMaximum = await Assert.ThrowsAsync<PostgresException>(() =>
+                    db.Database.ExecuteSqlRawAsync("UPDATE app.incidents SET severity='LOW',maximum_severity_reached='LOW'"));
+                Assert.Equal("23514", lowerMaximum.SqlState);
+                var assigned = await db.OrganizationMemberships.Where(m => m.OrganizationId == organization.Id && m.UserId == administrator).Select(m => m.Id).SingleAsync();
+                await incidents.AssignAsync(administrator, organization.Id, registered.Id, new(assigned, "Runtime assignment", 13));
+                await incidents.TransitionAsync(administrator, organization.Id, registered.Id, new(IncidentState.UnderEvaluation, null, "Evaluate", 14));
+                await incidents.TransitionAsync(administrator, organization.Id, registered.Id, new(IncidentState.InResponse, null, "Respond", 15));
+                await incidents.TransitionAsync(administrator, organization.Id, registered.Id, new(IncidentState.Resolved, "Runtime resolution", "Resolve", 16));
+                var review = await incidents.RequestClosureAsync(administrator, organization.Id, registered.Id, new("Request closure", 17));
+                var closed = await incidents.DecideClosureAsync(administrator, organization.Id, registered.Id, review.ClosureReview!.Id,
+                    new(true, true, "Runtime exceptional self-approval", "Approve closure", 18));
+                Assert.Equal("CLOSED", closed.Status);
+                var terminalEdit = await Assert.ThrowsAsync<PostgresException>(() => db.Database.ExecuteSqlRawAsync("UPDATE app.incidents SET title='Forbidden terminal edit'"));
+                Assert.Equal("23514", terminalEdit.SqlState);
+                var reopened = await incidents.TransitionAsync(administrator, organization.Id, registered.Id, new(IncidentState.UnderEvaluation, null, "Reopen", 19));
+                Assert.Equal(ClosureReviewStatus.Invalidated, reopened.ClosureReview!.Status);
+                Assert.Equal(25, await db.AuditEvents.CountAsync());
                 foreach (var sql in new[] { "UPDATE app.incident_capability_assessments SET capability_id=capability_id", "DELETE FROM app.incident_capability_assessments", "TRUNCATE app.incident_capability_assessments", "ALTER TABLE app.incident_capability_assessments DISABLE TRIGGER ALL" })
                 {
                     var error = await Assert.ThrowsAsync<PostgresException>(() => db.Database.ExecuteSqlRawAsync(sql));

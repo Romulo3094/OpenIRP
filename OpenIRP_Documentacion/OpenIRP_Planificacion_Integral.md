@@ -987,3 +987,302 @@ La [guía CIA](Iteracion6_Evaluacion_CIA.md) enumera contratos y archivos. Tambi
 El prototipo matemático aislado pasó 3072 combinaciones completas, 12800 comparaciones de monotonicidad, seis casos de entrada desconocida y 14 escenarios. Evidencia: `artifacts/severity-proposal-fa6ccb7aec6040c0b0a11ccabf19e88c/`. Está fuera de la API y deja activatedInApi=false; esos casos no se suman a las 181 pruebas de integración. El usuario confirmó el 23 de octubre de 2026 Pending estricto y severity=null mientras falte cualquier entrada requerida, sin severidad provisional. Una evaluación actual Pending no borrará el máximo histórico ya calculado y no habilitará cierre. Esta decisión no activa el motor; siguen pendientes la validación de umbrales/operación, criticidad reevaluada e inicialización del máximo histórico antes de activarlo.
 
 Los cambios continúan locales, sin nuevo commit/push/merge. Severidad actual/máxima, alcance/afectación operacional, ciclo de vida completo y aprobaciones continúan pendientes; RLS y credenciales operativas separadas siguen en endurecimiento. No se habilitaron registro público, permisos globales de tenant ni acciones remotas sobre dispositivos.
+
+# 28. Iteración 7: alcance y afectación operacional (23 de octubre de 2026)
+
+Las iteraciones 3–6, la evaluación CIA y la decisión Pending estricto se confirmaron y publicaron en `0c706696499ae3a935c69aee5cdf135d541f5488` sobre `feature/paso26-identidad-organizaciones`, a petición del usuario. Antes de publicar se repitieron las 181 pruebas PostgreSQL 17: todas correctas, sin omitidas; Release sin errores/advertencias y modelo sin cambios pendientes. El remoto quedó en ese commit, sin merge.
+
+Después se implementó localmente PUT `/api/organizations/{org}/incidents/{incident}/context`, con alcance Single/Multiple/OrganizationWide y afectación operacional None/Degraded/MajorInterruption/CriticalInterruption. Ambas entradas son nullable, explícitas y se reemplazan juntas con motivo y expectedRevision. La [guía de la Iteración 7](Iteracion7_Contexto_Incidente.md) define las categorías cualitativas, contratos, permisos, archivos y evidencias. No se infieren entradas del inventario, las capacidades, la categoría o CIA; isContextAssessmentComplete solo cubre estas dos entradas.
+
+El servicio mantiene la transacción/bloqueo común y revalida el contexto de autorización activo; ORG_ADMIN y ANALYST escriben, VIEWER consulta y PLATFORM_ADMIN no recibe permisos implícitos de tenant. La revisión, evaluación, evento CONTEXT_ASSESSED y SUCCESS de auditoría se confirman o revierten juntos. Los snapshots de todos los eventos posteriores conservan el contexto; CIA permanece independiente. El motivo privado no se copia a auditoría administrativa.
+
+Migración `20261023141918_IncidentContextAssessment`: cuatro columnas nullable sin DEFAULT, dos checks y ampliación del check de acciones. Preserva las siete migraciones anteriores, los datos y el trigger append-only. Down impide perder valores o eventos de evaluación, incluso tras un reset a null. Se amplió también la prueba del LOGIN SQL limitado.
+
+Verificación local:
+
+- Release sin errores ni advertencias; EF sin cambios de modelo pendientes.
+- PostgreSQL 17: **216/216 correctas**, sin fallidas/omitidas. Son 35 pruebas nuevas sobre las 181 anteriores, además de ampliar el caso runtime. Incluyen las 12 combinaciones completas, null/None/reset, snapshots posteriores/CIA, roles/contextos inactivos, tenants, valores inválidos/revisión, concurrencia forzada, rollback de ambos historiales, checks SQL, upgrade/downgrade y HTTP/CSRF. TRX: `artifacts/paso26-pg17-9ad09aae3b724ca19c9a115ef074a948/paso26-pg17.trx`.
+- PostgreSQL 18.3 nativo aislado: **216/216 correctas**, sin fallidas/omitidas. TRX: `artifacts/paso26-f5ea5bc7ebe048cb91c31f10c55d1f90/paso26.trx`. Modelo sin cambios pendientes; clúster temporal detenido. No se modificó el servicio PostgreSQL del sistema.
+- Migración aplicada solo a `openirp_dev`, PostgreSQL 17 habitual en 127.0.0.1:5433. Se restauró el respaldo completo en un contenedor separado sin puertos ni volúmenes y se compararon conteos/historial antes de aplicar. Conteos previos conservados: todas las tablas de negocio/identidad/auditoría vacías, ocho capacidades y tres categorías; ningún registro de contexto fabricado. Cuatro columnas nullable sin DEFAULT, dos checks validados y protección del historial verificados.
+- Respaldo/SQL/conteos/restauración/esquema: `artifacts/incident-context-dev-b97445be42bb4b18a93232ccf9d9116e/`. Dump `openirp_dev-before-incident-context.dump`, SHA256 `C84739AA53EE432127C9BBB779EE03C0F90C9DD6A70F7C85079C2DF1A42A20CA`.
+- HTTPS real: health 200, OpenAPI 200 con PUT de contexto, escritura anónima 401; proceso propio detenido. Evidencia: `artifacts/incident-context-http-966ba763f3e5412089ab1c0c2ef0190b/`. Solo el cliente de comprobación aceptó el certificado local, sin cambiar HTTPS/cookies de la API.
+
+Esta nueva subfase queda local, posterior a 0c70669, sin otro commit/push/merge. La regla permanece sin activar; sigue confirmada la política Pending/severity=null cuando falte cualquier entrada requerida. Quedan por desarrollar la criticidad evaluada, validar los umbrales e inicializar justificadamente el máximo histórico, además del ciclo de vida/aprobaciones. RLS y separación operativa de credenciales continúan pendientes.
+
+# 29. Iteración 8: criticidad evaluada del incidente (23 de octubre de 2026)
+
+Se implementó PUT `/api/organizations/{org}/incidents/{incident}/criticality` con valor explícito Low/Medium/High/NotApplicable/null, motivo y revisión. La evaluación es independiente del inventario y de los snapshots originales de activos. Una reducción respecto del máximo reportado o de la última evaluación conocida exige justificación adicional. El servicio consulta el historial para que un reset o una invalidación no eluda ese control.
+
+Los cambios de activos (reporte, adjunto o vinculación) invalidan la criticidad vigente en su misma transacción y conservan la decisión anterior en el historial. CIA, contexto operacional, título, asignación y capacidades conservan la evaluación. Cada snapshot incluye assessedCriticality y criticalityAssessedAtRevision; la bandera de completitud cubre solo esta entrada.
+
+El evento CRITICALITY_ASSESSED conserva el contexto de reportes observado: cantidades, máximo conocido, revisión de fuentes, huella SHA-256 versionada de UUID/revisiones y referencia a la última decisión conocida. Los identificadores se leen en streaming ordenado por UUID bajo el bloqueo común y el resumen tiene tamaño acotado. La [guía de la Iteración 8](Iteracion8_Criticidad_Incidente.md) documenta la reconstrucción de fuentes y las limitaciones de la huella: no constituye una firma ni reemplaza los eventos originales.
+
+Se mantienen autorización organizacional y revalidación del contexto activo, revisión optimista, auditoría mínima y rollback conjunto de datos/historiales. La prueba LOGIN runtime limitado también se amplió; no se alteran credenciales o roles habituales. El SQL directo y futuros escritores deben respetar el protocolo existente.
+
+Migración `20261023200334_IncidentCriticalityAssessment`: cuatro columnas nullable sin DEFAULT, dos checks de valores/revisiones y ampliación del check de acciones. Conserva las ocho migraciones anteriores; no inventa evaluaciones previas ni desactiva triggers. Down se niega si perdería valores, referencias o eventos de evaluación, incluso tras un reset.
+
+- Compilación Release sin errores ni advertencias; EF sin diferencias de modelo.
+- PostgreSQL 17: **259/259 correctas**, cero fallidas/omitidas. TRX: `artifacts/paso26-pg17-a39d69f630d240e4a66f75f945bf968d/paso26-pg17.trx`.
+- PostgreSQL 18.3 nativo aislado: **259/259 correctas**, cero fallidas/omitidas. TRX: `artifacts/paso26-00d12df41413483eb2be6dfdd7ded010/paso26.trx`. EF sin diferencias; clúster temporal detenido. No se modificó el servicio PostgreSQL del sistema.
+- Se agregaron 43 casos sobre las 216 pruebas anteriores y se amplió el LOGIN SQL limitado. Cubren valores/null/NotApplicable, conservación de reportes, reducciones justificadas y protección tras reset/invalidation, fuentes y huellas, snapshots posteriores, roles/contextos inactivos/tenants, validación/revisión, carreras forzadas, rollback de evaluación/invalidation si falla cualquiera de los historiales, checks SQL, upgrade/downgrade y HTTP/CSRF.
+- La primera ejecución PostgreSQL 17 pasó 253/253. Después se incorporaron seis casos de reducción frente a la última decisión conocida y se repitió la batería completa sobre el código final; la evidencia final es 259/259.
+- Migración aplicada únicamente a openirp_dev en PostgreSQL 17 habitual, 127.0.0.1:5433. Dump completo restaurado en otro contenedor sin puertos ni volúmenes y conteos/historial cotejados antes de aplicar. Se preservaron todas las tablas de negocio/identidad/auditoría vacías, ocho capacidades y tres categorías. No se fabricaron evaluaciones.
+- Respaldo/SQL/conteos/restauración/esquema: `artifacts/incident-criticality-dev-ff919de8d006485ba3f289176b550d26/`. Dump `openirp_dev-before-incident-criticality.dump`, SHA256 `34BE59A865E43397EE9AA868DC488C073C9F385D4B6D1803E7A5E42B705B18C8`. Cuatro columnas nullable sin DEFAULT, dos checks validados, acción nueva y trigger del historial verificados.
+- HTTPS real: health 200, OpenAPI 200 con PUT de criticidad y escritura anónima 401. Evidencia: `artifacts/incident-criticality-http-c2b015aeb71c4172882448816f84583f/`. El proceso propio se detuvo al terminar. Solo el cliente de comprobación aceptó el certificado local; la API conserva HTTPS/cookies Secure.
+- Sin nuevo commit/push/merge. Los cambios quedan locales junto con la Iteración 7, posteriores al commit publicado 0c70669.
+
+Los cambios de las iteraciones 7 y 8 permanecen locales después de `0c70669`, sin nuevo commit/push/merge. CIA, alcance, afectación operacional y criticidad ya disponen de contratos de evaluación, pero el motor de severidad sigue inactivo: faltan validación de umbrales e inicialización del máximo histórico. Se mantiene Pending/severity=null para entradas incompletas como política de la futura clasificación. Transiciones/cierre/aprobaciones, RLS y endurecimiento operativo continúan pendientes.
+
+# 30. Iteración 9: clasificación determinista y máximo histórico (23 de octubre de 2026)
+
+El usuario adoptó la matriz v1 como regla inicial del MVP, conservando Pending/severity=null para entradas incompletas y sujeta a evaluación con casos reales. También aprobó que los incidentes anteriores inicien el máximo histórico desde una primera clasificación explícita y auditable, sin reescribir eventos ni atribuir severidades retrospectivas.
+
+Se implementó `openirp-severity-v1` en el dominio y PUT `/api/organizations/{org}/incidents/{incident}/severity`. Los incidentes nuevos comienzan Pending con la versión registrada. Los anteriores quedan NotEvaluated hasta ese endpoint; tras activarse, los cambios en CIA, contexto, criticidad o activos recalculan dentro de la misma transacción. Los cambios de activos invalidan la criticidad antes de calcular; las demás modificaciones conservan los valores y la referencia a su cálculo.
+
+Los snapshots tipados exponen severity, maximumSeverityReached, severityRuleVersion y severityAssessedAtRevision. Cada cálculo conserva las seis entradas, regla coincidente, revisión y máximo anterior/nuevo en details.classification, integrado con los detalles anteriores del evento. El máximo nunca disminuye ni se borra cuando el resultado vuelve a Pending. Un trigger SQL bloquea también rebajas directas con SQLSTATE 23514.
+
+Se mantienen autorización por organización y revalidación del contexto activo, motivo/revisión explícitos, concurrencia bajo el bloqueo común, rollback conjunto e historiales protegidos. No se habilitan transiciones ni cierre: el estado continúa REGISTERED. No se agregan permisos globales, registro público ni comandos remotos.
+
+Migración `20261023202856_IncidentSeverityClassification`: ocho columnas nullable sin DEFAULT, dos checks, nueva acción y función/trigger para el máximo histórico. No rellena clasificaciones previas ni desactiva protecciones. Down se niega a perder clasificaciones/metadatos, incluso Pending. Los tests de migraciones anteriores utilizan fixtures representativos de datos previos a la activación; los contratos HTTP se adaptaron a los campos aditivos.
+
+La [guía de la Iteración 9](Iteracion9_Severidad_Incidente.md) detalla reglas, contratos, permisos, archivos y límites.
+
+- Release sin errores ni advertencias; EF sin diferencias de modelo.
+- PostgreSQL 17: **314/314 correctas**, cero fallidas/omitidas. TRX: `artifacts/paso26-pg17-4d303a84e27640e5a61e924988ed69ba/paso26-pg17.trx`.
+- PostgreSQL 18.3 nativo aislado: **314/314 correctas**, cero fallidas/omitidas. TRX: `artifacts/paso26-5f1c386fc6f64613a31e23d44a7abb0c/paso26.trx`. EF sin diferencias y clúster temporal detenido. El servicio PostgreSQL del sistema no se modificó.
+- Son 55 casos nuevos sobre los 259 anteriores: 20 del evaluador de dominio (incluyen las 3072 combinaciones y 12800 comparaciones de monotonicidad) y 35 de integración PostgreSQL. La suite suma 314; las combinaciones internas no se suman de nuevo al total. Los 20 casos del evaluador también pasaron aisladamente en `artifacts/severity-rule-v1/severity-rule-v1.trx`.
+- La integración cubre los cuatro niveles, Pending, máximo no decreciente, invalidación por activos, conservación en otras modificaciones, adopción explícita sin reescribir historia, roles/contextos inactivos/tenants, revisiones, concurrencia forzada, rollback de clasificación/máximo y primera adopción, checks/trigger, upgrade/downgrade y HTTP/CSRF. La prueba del LOGIN SQL limitado también clasifica y verifica que no puede rebajar el máximo.
+- Migración aplicada únicamente a openirp_dev, PostgreSQL 17 habitual en 127.0.0.1:5433. El respaldo completo se restauró en un contenedor separado sin puertos ni volúmenes; conteos e historial coincidieron antes de aplicar. Las tablas de negocio/identidad/auditoría siguen vacías, con ocho capacidades y tres categorías; ninguna clasificación fabricada.
+- Respaldo/SQL/conteos/restauración/esquema: `artifacts/incident-severity-dev-40016ca50f244c529f225141e8a5c342/`. Dump `openirp_dev-before-incident-severity.dump`, SHA256 `7D8C72F3C542F13202C42E7A685BDA343F12884BA450057FD8139E24F3610FBB`. Ocho columnas nullable sin DEFAULT, dos checks validados, acción nueva y triggers del máximo/historial habilitados.
+- HTTPS real: health 200, OpenAPI 200 con PUT de severidad y escritura anónima 401. Evidencia: `artifacts/incident-severity-http-5757098c6bce4ad09fcc4e8f5973bc11/`. El proceso propio se detuvo; solo el cliente de comprobación aceptó el certificado local, sin modificar HTTPS/cookies Secure de la API.
+- Sin nuevo commit/push/merge; las iteraciones 7–9 continúan locales después del commit publicado 0c70669.
+
+Las iteraciones 7–9 continúan locales después de 0c70669, sin nuevo commit/push/merge. El siguiente bloque son transiciones, resolución, descarte/reapertura y aprobaciones de cierre vinculadas a revisión. La evaluación empírica de umbrales, RLS y el endurecimiento operativo siguen pendientes.
+
+# 31. Iteración 10: ciclo de vida y cierre (23 de octubre de 2026)
+
+Se implementaron las nueve transiciones de §7.1 y los endpoints PUT state, POST closure-requests y PUT closure-requests/{request}. Resolver requiere resolución documentada; cerrar exige clasificación completa y responsable asignado activo. LOW/MEDIUM cierra el responsable; HIGH/CRITICAL histórico exige decisión ORG_ADMIN, incluso si la severidad actual disminuyó. Pending y NotEvaluated no habilitan cierre.
+
+La aprobación confirma CLOSED y su decisión en la misma transacción. Una autoaprobación requiere ORG_ADMIN, marca explícita y justificación adicional. Se revalidan solicitante, asignación y contexto del revisor bajo el bloqueo compartido. Modificar el incidente invalida su revisión pendiente; reabrir invalida la decisión anterior en el estado vigente, conservándola en el historial.
+
+La resolución y la revisión vigente se materializan sobre el agregado; los snapshots inmutables conservan cada solicitud y decisión. Los campos incluyen identidad de solicitud, revisión y usuario solicitantes, estado de revisión, decidor/revisión, marca y justificación de autoaprobación. No se atribuye doble control a una excepción de autoaprobación.
+
+CLOSED y DISCARDED requieren reapertura antes de escrituras ordinarias. PostgreSQL bloquea saltos ilegales, ediciones terminales y cierres sin la coherencia requerida. La protección del máximo y el historial append-only permanecen habilitados. Estado, resolución, revisión, decisión, snapshot y SUCCESS de auditoría confirman o revierten juntos.
+
+Migración `20261023220910_IncidentLifecycleClosure`: dieciocho columnas nullable sin DEFAULT, cuatro checks de ciclo/revisión, ampliación de checks de estados/acciones, FK de usuarios, UUID de solicitud vigente único y trigger de ciclo de vida. Conserva las diez migraciones anteriores y rechaza downgrade con datos/historia de workflow.
+
+La [guía de la Iteración 10](Iteracion10_Ciclo_Vida_Cierre.md) detalla permisos, campos, endpoints, archivos y límites del cierre manual.
+
+- Release sin errores ni advertencias; EF sin diferencias de modelo.
+- Prueba enfocada del módulo: **49/49 correctas** en PostgreSQL 17, cero fallidas/omitidas. TRX: `artifacts/workflow-focused-pg17-c7f680e9bf824e41b62de77756658567/paso26-pg17.trx`.
+- Regresión completa PostgreSQL 17: **363/363 correctas**, cero fallidas/omitidas. TRX: `artifacts/paso26-pg17-e2d7321a98b64e10b2bfcf11654df4a9/paso26-pg17.trx`.
+- Regresión completa PostgreSQL 18.3 nativo aislado: **363/363 correctas**, cero fallidas/omitidas. TRX: `artifacts/paso26-ad8a64f0e02d4433ba0aeacc135d8397/paso26.trx`. EF sin diferencias; clúster temporal detenido y servicio del sistema sin modificar.
+- Son 49 casos nuevos sobre los 314 anteriores: dos de dominio (36 pares de estados, nueve transiciones permitidas) y 47 de integración. Los 49 enfocados ya están incluidos en los 363, no se suman otra vez. Se amplió también el LOGIN SQL limitado para asignar, transicionar, resolver, solicitar, autoaprobar justificadamente, rechazar edición terminal y reabrir.
+- Cobertura: cierre LOW/MEDIUM asignado, máximo HIGH/CRITICAL aun con severidad actual baja, Pending/NotEvaluated, rechazo/reemplazo de solicitudes, autoaprobación y declaraciones inconsistentes, invalidación por modificaciones/reapertura, roles/contextos inactivos/solicitante reasignado, aislamiento de tenants/incidentes, transiciones y campos inválidos, bloqueo de todas las escrituras ordinarias terminales, carreras forzadas, rollback por fallos de ambos historiales, protecciones SQL, upgrade/downgrade e HTTP/CSRF.
+- Migración aplicada solo a openirp_dev en PostgreSQL 17 habitual, 127.0.0.1:5433. Dump completo restaurado en otro contenedor sin puertos ni volúmenes; conteos e historial cotejados antes de aplicar. Se preservaron las tablas de negocio/identidad/auditoría vacías, ocho capacidades y tres categorías. No se fabricaron cuentas, resoluciones o decisiones.
+- Respaldo/SQL/conteos/restauración/esquema: `artifacts/incident-workflow-dev-1b661a9a3b1345f5a980a76fdeb4da19/`. Dump `openirp_dev-before-incident-workflow.dump`, SHA256 `84E749E806012E412060F2B2302D121635A76503843CB8B556D9A6DD8015FDE2`. Dieciocho columnas nullable sin DEFAULT, cuatro checks nuevos y cuatro FK validados, identidad única de solicitud y triggers de ciclo/máximo/historial habilitados.
+- HTTPS real: health 200, OpenAPI 200 con las tres rutas nuevas, PUT estado/POST solicitud/PUT decisión anónimos 401. Evidencia: `artifacts/incident-workflow-http-1feb3e491dd64658b2e3fa4e60a9bcf5/`. Proceso propio detenido; solo el cliente de comprobación aceptó el certificado local.
+- Cambios locales, sin nuevo commit/push/merge. Los contenedores habituales PostgreSQL/Ollama se conservan y las instancias temporales se detuvieron.
+
+Las iteraciones 7–10 permanecen locales después de 0c70669. El primer catálogo de borradores se incorpora en §32; quedan publicación de versiones inmutables, ejecución guiada y evidencias. Sus precondiciones de cierre se integrarán al implementar esos módulos. RLS, separación operativa completa de credenciales y evaluación empírica de umbrales siguen pendientes.
+
+
+# 32. Iteración 11 — Catálogo administrativo y borradores de playbooks
+
+Fecha: 2026-10-23. Se incorpora la primera subfase del módulo previsto en §8: creación, consulta, listado y reemplazo de borradores estructurados de playbooks PUBLIC/PRIVATE.
+
+Solo PLATFORM_ADMIN activo administra los borradores globales (organization_id NULL); solo ORG_ADMIN activo administra los privados de su organización. PUBLIC no habilita acceso anónimo ni lectura de borradores por cualquier usuario. El rol global no evita las comprobaciones de membresía privada. ANALYST/VIEWER no acceden a borradores en esta subfase.
+
+Cada playbook crea su versión 1 DRAFT, con objetivo/instrucciones, pasos con flags explícitos, dependencias DAG y requisitos REQUIRED/RECOMMENDED por versión o paso. La edición reemplaza íntegramente el grafo del borrador, conserva UUID de agregado/versión e incrementa revisión. Las posiciones no sustituyen las dependencias. El servicio valida códigos, duplicados, referencias, límites y ciclos en cualquier componente.
+
+No se implementan todavía publicación, nuevas versiones, revisión, puntero vigente, retirada, clonación ni ejecución. El esquema rechaza estados/números distintos del primer DRAFT. El historial narrativo y snapshots de contenido de borradores no forman parte de esta entrega; la auditoría registra actor, ámbito, revisión y versión con metadatos mínimos. La guía detalla esta limitación y el contrato completo.
+
+Mutación, reemplazo del grafo y SUCCESS de auditoría son una transacción. Se reutiliza el gate compartido con identidad, se revalida autorización después de obtenerlo y se comprueba expectedRevision. Lecturas de agregado coherentes con REPEATABLE READ. Pruebas con dos escritores realmente en espera y fallo inyectado del log verifican concurrencia y rollback.
+
+Migración 20261023231051_PlaybookDraftCatalog: cinco tablas, 31 columnas, 11 FK, ocho checks, índices de referencias/unicidad parcial y cuatro triggers de identidad/no eliminación. FK compuestas impiden dependencias/requisitos de pasos entre versiones. Down bloquea pérdida de datos si existen playbooks. El LOGIN SQL restringido puede reemplazar borradores, pero no cambiar propietario/identidad ni publicar.
+
+[Guía de Iteración 11, ejemplos y archivos](Iteracion11_Catalogo_Borradores_Playbooks.md).
+
+- Compilación Release limpia y EF sin cambios de modelo pendientes.
+- **44/44 pruebas enfocadas correctas**; **407/407 correctas tanto en PostgreSQL 17 como en PostgreSQL 18.3**, sin fallidas ni omitidas. Los 44 casos nuevos (seis de dominio y 38 de integración) están incluidos en los 407.
+- TRX: artifacts/playbook-focused-pg17-0995967ced0d45cbb7a0eda8c0daa2f9/paso26-pg17.trx; artifacts/paso26-pg17-0ec5d58e886542b5a6241dd41ca88e7e/paso26-pg17.trx; artifacts/playbooks-full-pg18-0706134505774c7c81ff84998be0423f/paso26.trx.
+- Migración aplicada solo a openirp_dev (127.0.0.1:5433) tras backup/restauración aislada verificados. Datos existentes conservados: negocio/identidad/auditoría vacíos, ocho capacidades y tres categorías; las cinco tablas nuevas están vacías.
+- Respaldo/SQL/conteos/esquema: artifacts/playbook-drafts-dev-4101114a8542483fadf53d24f8ec905b/. Dump openirp_dev-before-playbook-drafts.dump, SHA256 21AEF2D19A7A9BE221C53B66CA9C6519664EFF045C009B4B03140E9A7E058045. El ensayo definitivo esperó disponibilidad TCP antes de restaurar.
+- Verificación local de cinco tablas/31 columnas/11 FK/ocho checks/cuatro guards e índices parciales. HTTPS real: health/OpenAPI 200 y ocho operaciones anónimas 401; artifacts/playbook-drafts-http-a5578bb6dd08419889a79773a93040e7/.
+- Instancias temporales detenidas, servicios habituales preservados. Cambios locales sin nuevo commit, push ni merge; no se detectaron bloqueantes para la siguiente subfase.
+
+Las iteraciones 7–11 permanecen locales después de 0c70669. El ciclo de revisión/publicación, versiones sucesivas y retirada se incorpora en §33. Quedan clonación entre playbooks, ejecución guiada/evidencias y sus condiciones de cierre. RLS, separación operativa de credenciales y evaluación empírica de severidad siguen pendientes.
+
+
+# 33. Iteración 12 — Revisión, publicación inmutable y vigencia
+
+Fecha: 2026-10-23. Se amplía §32 con revisión, publicación, versiones sucesivas del mismo playbook y retirada sin sustituta.
+
+DRAFT pasa a IN_REVIEW con solicitud UUID nueva, solicitante y evento de revisión. La decisión actual y expectedRevision son obligatorios. Rechazar vuelve a DRAFT y conserva el historial; reenviar crea otra solicitud. Publicar revalida tanto al revisor como al solicitante y las referencias activas del contenido. Solo PLATFORM_ADMIN administra el ámbito global y ORG_ADMIN el privado.
+
+Una autoaprobación exige declaración explícita y justificación adicional; queda identificada como excepción, no como revisión por dos personas. Decisiones, estado, puntero y SUCCESS de auditoría confirman o revierten juntos bajo el gate compartido con identidad.
+
+Cada versión guarda título/categoría propios. La revisión congela contenido y nodos; published_at hace permanente esa inmutabilidad, también tras ARCHIVED. Un nuevo borrador puede copiar una publicación del mismo playbook con nuevos UUID y source_version_id. Único borrador/revisión activo y numeración creciente; la vigencia jamás se infiere mediante MAX.
+
+current_published_version_id selecciona explícitamente la versión vigente. Retirar la vigente deja NULL; retirar otra histórica conserva la actual. Las publicaciones anteriores siguen disponibles para consulta administrativa. La lectura de vigentes globales requiere cuenta activa; la privada requiere membresía/organización activas, incluidos ANALYST/VIEWER. No hay acceso anónimo ni grant global a datos privados. Los campos de un borrador posterior no aparecen en las publicaciones/listados vigentes.
+
+Migración 20261024010838_PlaybookPublication: tabla de revisiones append-only, puntero y metadatos de versión, copia de título/categoría de borradores anteriores y eliminación de defaults técnicos tras la copia. Módulo con seis tablas/50 columnas/17 FK/14 checks/14 guards, procedencia y puntero compuestos, unicidad de borrador/revisión, checks de estado y verificación diferida del puntero. Down bloquea pérdida de datos cuando hay playbooks o historial.
+
+[Guía de Iteración 12: contratos, archivos, reglas y verificación](Iteracion12_Publicacion_Versiones_Playbooks.md).
+
+- **88/88 pruebas enfocadas correctas**, con los 44 casos anteriores y 44 nuevos de integración.
+- **451/451 pruebas correctas en PostgreSQL 17 y PostgreSQL 18.3**, sin fallidas ni omitidas. Compilación Release limpia y EF sin diferencias de modelo. Los enfocados y los nuevos ya están incluidos en los 451.
+- TRX: artifacts/publication-focused-pg17-8cd5554734dc46b29bf992b5546cb714/paso26-pg17.trx; artifacts/paso26-pg17-812843d29b124ec383cd8fb02c530b0f/paso26-pg17.trx; artifacts/publication-full-pg18-15bef111c5634f22a84b68238234843c/paso26.trx.
+- Migración local aplicada únicamente a openirp_dev (127.0.0.1:5433) tras respaldo/restauración completa aislada y cotejo de conteos/historial. Tablas de negocio/identidad/auditoría/playbooks conservadas vacías, ocho capacidades y tres categorías; nueva tabla de revisiones vacía, trece migraciones.
+- Respaldo/SQL/conteos/esquema: artifacts/playbook-publication-dev-35862eb4be274fa6ae6c4bbb3b3fed0d/. Dump openirp_dev-before-playbook-publication.dump, SHA256 20455AFDA67098225FD765BFFD6248E0599940CD3EE77A96A4D627C10175D80C.
+- SQL revisado con copia controlada de título/categoría, sin eliminar datos/tablas. Metadatos verificados: seis tablas, 50 columnas, 17 FK, 14 checks, 14 guards y defaults de backfill eliminados.
+- HTTPS real: health/OpenAPI 200, 26 operaciones de playbooks presentes y anónimos 401. Evidencia: artifacts/playbook-publication-http-07f72cf2083147688362dcf2816ae141/.
+- Instancias temporales detenidas y servicios habituales preservados; sin bloqueantes detectados. Cambios locales, sin nuevo commit/push/merge.
+
+Las iteraciones 7–12 permanecen locales después de 0c70669. La clonación controlada se incorpora en §34; continúan ejecuciones/tareas/evidencias. Las retiradas por seguridad y sus bloqueos de ejecuciones, condiciones de cierre, RLS, separación operativa de credenciales y evaluación empírica de severidad siguen pendientes.
+
+
+# 34. Iteración 13 — Clonación controlada y procedencia
+
+Fecha: 2026-10-23. Completa la copia autorizada entre playbooks prevista en §8, sobre el versionado de §33.
+
+Se permite PUBLIC vigente → PRIVATE con ORG_ADMIN del destino, PUBLIC vigente → PUBLIC con PLATFORM_ADMIN y PRIVATE vigente → PRIVATE de la misma organización con ORG_ADMIN. Exportar PRIVATE a otra organización o PUBLIC está prohibido, incluso con administración en ambas o grant global. Los borradores, revisiones, archivadas y publicaciones ya no vigentes no sirven como fuente de esta operación.
+
+La solicitud identifica agregado fuente, UUID exacto de versión vigente y expectedSourceRevision del agregado, junto con motivo. Bajo el gate compartido se revalidan actor/destino y fuente/revisión/vigencia. Se exige categoría/capacidades activas, sin eliminar requisitos ni copiar disponibilidad organizacional.
+
+Cada POST aceptado crea agregado y versión 1 DRAFT independientes, con UUID nuevos para todos los nodos. Se copian contenido, flags, enlaces y requisitos; no se heredan revisiones, aprobaciones, fecha de publicación ni puntero vigente. La fuente permanece sin cambios. Copia, todos sus nodos y SUCCESS de auditoría confirman o revierten juntos.
+
+La procedencia externa vive en playbook.sourceVersionId/sourceRevision; la relación interna sourceVersionId de cada versión conserva su significado de predecesora dentro del mismo playbook. GET administrativo /origin devuelve motivo, actor/fecha y referencias de origen. El motivo no aparece en consultas de vigentes ni auditoría mínima. Fuente retirada después de crear no borra ni modifica copias existentes; bloqueos por retirada de seguridad siguen pendientes del módulo de ejecución.
+
+Migración 20261024021251_PlaybookCloning: tres columnas nullable sin DEFAULT en app.playbooks, FK/índice de versión fuente, check de procedencia completa y trigger de origen inmutable. En creación verifica publicación vigente, revisión y compatibilidad de ámbito, con bloqueo FOR SHARE de filas fuente. Down bloquea si hay procedencia. Módulo con seis tablas/53 columnas/18 FK/15 checks/15 guards; no reescribe datos existentes.
+
+[Guía de Iteración 13: permisos, contratos, campos, archivos y verificación](Iteracion13_Clonacion_Playbooks.md).
+
+- Release sin errores ni advertencias y EF sin diferencias de modelo.
+- **127/127 pruebas enfocadas correctas** (88 anteriores y 39 nuevas de integración); **490/490 correctas en PostgreSQL 17 y PostgreSQL 18.3**, sin fallidas ni omitidas. Los enfocados ya están incluidos en los 490.
+- TRX: artifacts/clone-focused-pg17-1dfdd3f7478641a0b5484998d022478a/paso26-pg17.trx; artifacts/paso26-pg17-542551579640484a91c8841a665acf9c/paso26-pg17.trx; artifacts/cloning-full-pg18-b9b224974c134b53988a4f0481b6ce3e/paso26.trx.
+- Migración aplicada solo a openirp_dev (127.0.0.1:5433) después de respaldo/restauración completa aislada y cotejo de conteos/historial. Datos existentes conservados: tablas de negocio/identidad/auditoría/playbooks vacías, ocho capacidades y tres categorías. Ninguna copia, cuenta ni publicación fabricada; catorce migraciones.
+- Respaldo/SQL/conteos/esquema: artifacts/playbook-cloning-dev-64af77d210044d7bbbeb5639476bb86f/. Dump openirp_dev-before-playbook-cloning.dump, SHA256 63541323C2C0FB04F241600A7C8D94D0029D22D3170AA4C5E30E78B01DD46845.
+- SQL Up sin eliminación ni actualización de datos. Esquema verificado: seis tablas, 53 columnas, 18 FK, 15 checks, 15 guards y tres columnas nuevas nullable sin DEFAULT.
+- HTTPS real: health/OpenAPI 200 y 30 operaciones de playbooks anónimas 401. Evidencia: artifacts/playbook-cloning-http-64324e209a4d45fa8464b9cc965f9940/.
+- Instancias temporales detenidas, PostgreSQL/Ollama y apps/web preservados. Sin bloqueantes detectados; trabajo local sin nuevo commit/push/merge.
+
+Las iteraciones 7–13 permanecen locales después de 0c70669. El flujo inicial de ejecución/tareas se incorpora en §35; continúan evidencias y aprobaciones/excepciones. Se integrarán retiradas de seguridad, bloqueos de continuidad y condiciones de cierre. RLS, separación operativa de credenciales y evaluación empírica de severidad siguen pendientes.
+
+
+# 35. Iteración 14 — Ejecuciones y tareas iniciales
+
+Fecha: 2026-10-24. Se implementa el primer flujo operativo de §9: iniciar una publicación vigente sobre incidente IN_RESPONSE, generar una tarea por paso, asignar responsables, aplicar dependencias y completar/cancelar explícitamente.
+
+Solo ORG_ADMIN/ANALYST activos de la organización escriben; VIEWER consulta. El grant global no evita membresía privada. El inicio comprueba revisión de incidente/playbook, versión vigente publicada, ámbito, categoría y referencias activas. Un índice único parcial limita a una ejecución IN_PROGRESS por incidente.
+
+Tareas PENDING/IN_PROGRESS/BLOCKED/COMPLETED con transiciones controladas, motivo y asignación activa actual. Solo el usuario asignado avanza estados; dependencias requieren predecesores COMPLETED. Pasos con RequiresApproval se bloquean antes de iniciar; RequiresEvidence impide completar. SKIPPED se rechaza hasta implementar autorizaciones. No se simulan ni omiten esos controles pendientes.
+
+La versión de ejecución es inmutable. Una publicación anterior aún PUBLISHED puede continuar aunque otra sea vigente. ARCHIVED bloquea asignación/avance/finalización; solo ORG_ADMIN puede cancelar esa ejecución. La continuidad con security_hold_id y su autorización todavía está pendiente.
+
+Cada mutación incrementa revisiones de ejecución e incidente y confirma con snapshot del incidente, evento de tarea/ejecución y SUCCESS de auditoría en la misma transacción/gate. No recalcula severidad por cambios puramente operativos. Una ejecución activa impide cambiar categoría o salir de IN_RESPONSE, incluso para resolución/cierre; completar/cancelar no resuelve ni cierra automáticamente.
+
+Migración 20261024034804_InitialPlaybookExecutions: tres tablas/36 columnas nuevas, diez FK y ocho checks nuevos, índice de ejecución activa, identidad/terminales protegidos, historial append-only e integridad diferida del conjunto exacto de tareas. Se amplían acciones de incidente sin reescribir historia y se protege su transición con ejecución activa. El módulo playbooks/ejecución queda en nueve tablas/89 columnas/28 FK/23 checks; sus guards y el del incidente suman 24. Down bloquea pérdida de datos/historia operativa.
+
+[Guía de Iteración 14: contratos, archivos, permisos y límites](Iteracion14_Ejecuciones_Tareas.md).
+
+- Release sin errores ni advertencias; EF sin diferencias de modelo.
+- **90/90 pruebas enfocadas correctas**, con 41 nuevas de ejecución y 49 anteriores de ciclo de vida. **531/531 correctas tanto en PostgreSQL 17 como en PostgreSQL 18.3**, sin fallidas ni omitidas. Los enfocados ya están incluidos en los 531.
+- TRX: artifacts/execution-focused-pg17-9cb0cdd9de90471c8eda42557bce4371/paso26-pg17.trx; artifacts/paso26-pg17-9b8a23ee57e3431c84f3e089e0bb0b78/paso26-pg17.trx; artifacts/executions-full-pg18-beb64e18b3c446b784856daea7de7509/paso26.trx.
+- Migración local aplicada solo a openirp_dev (127.0.0.1:5433) tras respaldo/restauración completa aislada y cotejo de conteos/historial. Datos existentes conservados: tablas de negocio/identidad/auditoría/playbooks vacías, ocho capacidades y tres categorías; tablas de ejecución/tareas/eventos vacías, quince migraciones.
+- Respaldo/SQL/conteos/esquema: artifacts/playbook-executions-dev-1373b58baafe45279fe39aea8f7e4abd/. Dump openirp_dev-before-playbook-executions.dump, SHA256 39BB768D5FFB38AF9BA4ED762E1E4F00518A01274C961430799D7ED945B8E120.
+- SQL Up sin eliminar ni actualizar datos existentes. Verificadas nueve tablas del módulo, 89 columnas, 28 FK, 23 checks, 24 guards incluyendo incidente e integridad diferida de tareas.
+- HTTPS real: health/OpenAPI 200 y 38 operaciones de playbooks/ejecución anónimas 401. Evidencia: artifacts/playbook-executions-http-dfdd0be74d7143878f221fc197cfa04e/.
+- Instancias temporales detenidas y servicios/frontend habituales preservados. Cambios locales, sin nuevo commit/push/merge; sin bloqueantes detectados para la siguiente entrega.
+
+Las iteraciones 7–14 permanecen locales después de 0c70669. Continúan evidencias, aprobación de pasos, omisiones/excepciones y riesgo residual, seguridad de continuidad con bloqueo vigente, integración ampliada de cierre e IA supervisada. RLS, separación operativa de credenciales y evaluación empírica de severidad siguen pendientes.
+
+# 36. Iteración 15 — Aprobación de pasos de ejecución
+
+Fecha: 2026-10-24. Se implementa STEP_APPROVAL de §9.1 sobre las ejecuciones existentes: solicitud del responsable activo y decisión ORG_ADMIN, con motivo, revisión de incidente/ejecución y excepción explícita justificada cuando el administrador aprueba su propia solicitud.
+
+Las solicitudes y decisiones son registros independientes append-only. Cada solicitud admite una sola decisión; el rechazo permite otra con nuevo UUID. Una asignación posterior, incluso a la misma membresía, invalida solicitudes/autorizaciones anteriores. No se reutiliza una aprobación después de reasignar y volver al responsable original. Una tarea controlada iniciada debe bloquearse antes de reasignar.
+
+Se autoriza el paso inmutable y su asignación actual: el permiso sobrevive a bloqueo/reanudación sin reasignación, pero no evita comprobar cuenta, membresía, dependencias, versión PUBLISHED, incidente en respuesta y ejecución activa. STEP_APPROVAL permite iniciar/completar únicamente si también se cumplen los controles restantes. No equivale a omisión, evidencia, aceptación de IA ni aprobación de cierre.
+
+Tres operaciones nuevas: GET/POST del historial/solicitud en executions/{execution}/tasks/{task}/approvals y POST de decisión en approvals/{approvalRequest}/decision, siempre bajo la ruta de organización/incidente. Escrituras con cookie y CSRF; VIEWER solo consulta. PLATFORM_ADMIN no obtiene bypass privado.
+
+Migración 20261024224015_StepApprovals: app.step_approvals (16 columnas, cuatro FK, tres checks), identidad compuesta exacta de solicitud/tarea/responsable, decisión única, guards de participantes/rol/estado y un constraint trigger diferido que exige historia de ejecución correspondiente. Se amplían los checks de acciones sin reescribir eventos anteriores, se actualiza el guard de tarea para exigir autorización vigente y se mantiene el bloqueo de evidencias. Down impide perder aprobaciones/historia; las ejecuciones previas pueden actualizarse sin aprobaciones fabricadas.
+
+La solicitud/decisión, ambas revisiones, evento de ejecución, snapshot del incidente y auditoría SUCCESS se confirman en la misma transacción y gate. Un fallo en cualquier destino revierte todo. Runtime SQL solo SELECT/INSERT sobre la nueva tabla. RLS y separación operativa completa de credenciales siguen pendientes.
+
+[Guía de Iteración 15: contratos, permisos, archivos y verificación](Iteracion15_Aprobaciones_Pasos.md).
+
+- Release sin errores ni advertencias. Primer conjunto 67/67 correcto en PostgreSQL 18.3 temporal, incluido acceso con LOGIN SQL limitado y carreras forzadas. EF sin diferencias; primera instancia detenida.
+- **565/565 pruebas correctas** en PostgreSQL 18.3 temporal, cero fallidas/omitidas, con **34 casos nuevos** de aprobación. TRX: artifacts/step-approvals-full-pg18-e1988186f4414b47aadde6e28261e0a8/paso26.trx. Incluye regresión anterior, carreras forzadas, invalidación por reasignación, roles/cuentas/lockout, retirada/cancelación, dependencias/evidencia, rollback en auditoría/eventos/aprobaciones, SQL manipulado, upgrade/downgrade, HTTP/CSRF y LOGIN SQL limitado. EF sin diferencias; clúster detenido.
+- HTTPS real: health/OpenAPI 200, 41 operaciones presentes y anónimos 401; sin conexión a la base habitual. Flujos autenticados y CSRF comprobados en bases de prueba.
+- Bloqueante inicial de Docker resuelto el 2026-10-25: 565/565 correctas en PostgreSQL 17.11, cero fallidas/omitidas; contenedor temporal detenido. TRX: artifacts/paso26-pg17-d94db28ebf874a2da0804545abd438cc/paso26-pg17.trx.
+- StepApprovals aplicada a openirp_dev el 2026-10-25 tras respaldo completo restaurado/verificado y cotejo de datos/historial. Dieciséis migraciones, conteos previos conservados y tabla nueva vacía; sin cuentas/datos de prueba fabricados. Detalles en la regularización siguiente y la guía.
+- Trabajo local sin nuevo commit/push/merge; frontend y cambios anteriores preservados.
+
+Las iteraciones 7–15 continúan locales después de 0c70669. Siguen evidencias, omisiones/autorizaciones excepcionales y riesgo residual, continuidad por retirada de seguridad, integración ampliada de cierre e IA supervisada. El siguiente bloque funcional es evidencias de incidente/tarea, conservando controles de acceso y trazabilidad.
+
+## 36.1. Regularización local de Iteración 15 — 2026-10-25
+
+Docker recuperado. Se completó lo pendiente de la entrega inicial:
+
+- **565/565 correctas en PostgreSQL 17.11**, cero fallidas/omitidas. TRX: artifacts/paso26-pg17-d94db28ebf874a2da0804545abd438cc/paso26-pg17.trx. Se mantienen las 565/565 ya verificadas en PostgreSQL 18.3; no hubo cambios de implementación en esta regularización.
+- Release sin errores ni advertencias y EF sin diferencias de modelo. El contenedor de pruebas PostgreSQL 17 se detuvo al terminar.
+- Respaldo completo de openirp_dev y restauración exitosa en otro PostgreSQL 17, sin puertos ni volúmenes publicados. Conteos e historial restaurados idénticos al origen; se volvió a comprobar que la base habitual no hubiera cambiado antes de migrarla.
+- Dump: artifacts/step-approvals-dev-113a8c7cd3e84aa095895425dc33fc48/openirp_dev-before-step-approvals.dump. SHA256 **F0E013202CACB7D61EC3FA4C6C8F398F15265D6382E04730B3ADB7B4C3086CFA**.
+- Aplicada únicamente 20261024224015_StepApprovals a openirp_dev, propietario openirp, PostgreSQL 17.11 en 127.0.0.1:5433. **Dieciséis migraciones aplicadas**.
+- Conteos previos conservados: ocho capacidades y tres categorías; identidad, auditoría y tablas de negocio/playbooks/ejecuciones vacías. Nueva tabla step_approvals e historial STEP_APPROVAL vacíos. Sin cuentas ni datos de prueba fabricados en la base habitual.
+- Esquema real comprobado: 16 columnas, cuatro FK, tres checks, tres triggers, integridad de historial diferida y guard de tarea que exige autorización. Evidencia de respaldo, restauración, SQL incremental, conteos, scripts y esquema: artifacts/step-approvals-dev-113a8c7cd3e84aa095895425dc33fc48/.
+- HTTPS con conexión local configurada: health/OpenAPI 200 y 41 operaciones presentes, todas con anónimos 401. Evidencia: artifacts/step-approvals-local-http-944fc1021a1948e1bec5e36ce6b6cf69/. Estas llamadas anónimas no verifican un flujo de negocio autenticado sobre la base habitual; los flujos autenticados/CSRF quedaron cubiertos en las bases PostgreSQL 17 de pruebas.
+- API temporal y contenedores propios de prueba/restauración detenidos. PostgreSQL/Ollama habituales y frontend preservados. Sin nuevo commit, push ni merge.
+
+El bloqueo de Docker y la migración local pendiente de esta iteración quedan resueltos. Continúan los pendientes funcionales ya documentados: evidencias, omisiones/excepciones, continuidad por seguridad e IA supervisada.
+
+# 37. Iteración 16 — Evidencias TEXT/REFERENCE de incidente y tarea
+
+Fecha: 2026-10-26. Se implementa la primera subfase de §11, sobre ejecuciones y STEP_APPROVAL.
+
+ORG_ADMIN/ANALYST activos registran; miembros activos, incluido VIEWER, consultan; solo ORG_ADMIN retira. No hay bypass de PLATFORM_ADMIN. Se admiten TEXT y referencias HTTPS sin credenciales, sin consulta/descarga automática, con clasificación INTERNAL/CONFIDENTIAL. FILE y RESTRICTED siguen rechazados hasta completar sus políticas y controles.
+
+El contenido y los vínculos originales son inmutables. El registro comprueba/incrementa la revisión del incidente y confirma evidencia, historia específica, evento de incidente y auditoría en la misma transacción. La retirada usa revisión propia y confirma historia/auditoría sin modificar incidente/ejecución; funciona después de cerrar y conserva la decisión de cierre. Tras retirada se ocultan título y contenido en la API, sin purga física.
+
+Completar una tarea con RequiresEvidence exige completionEvidenceId explícito, activo y ligado a esa tarea, ejecución, versión, incidente y organización exactos. Se mantienen responsable, dependencias, aprobación y fuente utilizable. La tarea conserva el identificador como soporte histórico: una retirada posterior restringe contenido sin reescribir la finalización. Si la retirada gana la carrera, se rechaza completar con ese soporte.
+
+Migración 20261026163753_IncidentTextReferenceEvidence: dos tablas (17+10 columnas), siete FK nuevas, cinco checks nuevos, seis triggers (dos diferidos) y completion_evidence_id nullable sin DEFAULT en tareas. Guard de finalización bloquea/valida la evidencia activa y conserva STEP_APPROVAL. Historial inmutable y Down protegido contra pérdida de datos/historia. SQL runtime limitado a SELECT/INSERT y UPDATE de retirada/selección; RLS y separación operativa completa siguen pendientes.
+
+[Guía de Iteración 16: contratos, permisos, archivos y límites](Iteracion16_Evidencias_Incidente_Tarea.md).
+
+- Compilación Release sin errores/advertencias; EF sin diferencias de modelo.
+- **114/114 enfocadas correctas**, con 39 nuevas. **604/604 correctas en PostgreSQL 17 y 604/604 en PostgreSQL 18.3**, cero fallidas/omitidas. TRX: artifacts/evidence-full-pg17-d0080f5384db4b76be53563ebace8217/paso26-pg17.trx y artifacts/evidence-full-pg18-c254354372ca4bb79163d720bd582781/paso26.trx.
+- Migración aplicada únicamente a openirp_dev, propietario openirp, PostgreSQL 17.11 en 127.0.0.1:5433, tras restaurar un dump completo en otro contenedor sin puertos/volúmenes publicados y cotejar conteos/historial. **Diecisiete migraciones**; datos originales conservados, ocho capacidades/tres categorías y tablas de negocio vacías. Nuevas evidencias/eventos/referencias vacíos, sin cuentas/datos ficticios.
+- Evidencias: artifacts/incident-evidence-dev-8e65fcff819d4d48a3494a1a36cf1e21/. Dump openirp_dev-before-incident-evidence.dump, SHA256 F329B7403FECCDB972C3D46841692B0435D4F98481188F8D00CF3C6351AD55A3.
+- SQL Up revisado sin actualización/eliminación de datos previos; esquema real verificado, incluidos scopes, guards e historia diferida.
+- HTTPS con conexión local configurada: health/OpenAPI 200 y **46 operaciones** de playbooks/ejecuciones/aprobaciones/evidencias presentes, con anónimos 401. Flujos autenticados/CSRF en bases temporales. Evidencia artifacts/incident-evidence-http-a250e6f8bf5c46578b40decbcb64b1dd/.
+- Se ajustan dos pruebas de downgrade anteriores para reaplicar la última migración después de que un Down más antiguo se bloquee; así no consultan la columna nueva con un esquema anterior. TRUNCATE de prueba incluye las tablas relacionadas nuevas.
+- Contenedores/clústeres y API temporales detenidos; servicios habituales y frontend preservados. Cambios locales sin commit/push/merge nuevos.
+
+Continúan archivos privados, RESTRICTED/retención, omisiones/excepciones y riesgo residual, continuidad por seguridad, integración ampliada de cierre e IA supervisada. El módulo TEXT/REFERENCE ya permite satisfacer evidencia de tareas; no afirmar que FILE o los demás flujos estén completados.
+
+# 38. Iteración 17 — Archivos privados de evidencia
+
+Fecha: 2026-10-26. El usuario aprobó PDF/PNG/JPEG/TXT hasta 10 MB y conservación privada de retiradas sin purga automática.
+
+Se habilita carga multipart FILE para ORG_ADMIN/ANALYST, metadata por organización/incidente, SHA-256, directorio privado y descarga autorizada de miembros activos. ORG_ADMIN recupera archivos pendientes/fallidos. RESTRICTED permanece rechazado; PLATFORM_ADMIN no obtiene acceso organizacional implícito.
+
+La persistencia se divide en staging validado, metadata PENDING transaccional, movimiento sin sobrescritura y confirmación AVAILABLE/FAILED/QUARANTINED con historial y auditoría. Si el commit es incierto se conserva staging; una ausencia observada no permite inferir que un commit en curso no pueda confirmarse. La recuperación conserva bytes/identidad y verifica hash.
+
+Descargar exige estado/permiso actual, tamaño/hash y autorización final antes de entregar el stream como attachment/no-store. La retirada confirma cuarentena y bloquea nuevas descargas/finalizaciones, sin borrar físicamente ni reescribir tareas ya completadas. Una lectura autorizada previamente puede terminar. Finalización de tarea exige FILE AVAILABLE y comprobación física acotada; conserva dependencias, responsable, STEP_APPROVAL y ámbito exacto.
+
+RootPath absoluto local dedicado; ACL privada en Windows, sin rutas públicas/UNC/reparse points. El arranque local configura -EvidenceRoot, variable existente o .openirp-data/evidence, excluido de Git y grafos. Validación de MIME/extensión/cabeceras y TXT UTF-8 no equivale a antivirus ni parser completo.
+
+Migración 20261026183812_PrivateEvidenceFiles: evidence_files (13 columnas), evidence_file_events (11), tres FK, tres checks nuevos, ampliación de tipo FILE y siete triggers incluidos tres diferidos. Historial inmutable, estados/metadata protegidos, existencia de archivo para FILE y cuarentena al retirar. Down bloquea pérdida de archivos/historia. Permisos SQL de runtime limitados; sin RLS o separación operativa completa todavía.
+
+[Guía de Iteración 17: contratos, operación, límites y archivos](Iteracion17_Archivos_Privados_Evidencia.md).
+
+- Regresión completa: **639/639 en PostgreSQL 17 y 639/639 en PostgreSQL 18.3**, cero fallidas/omitidas. Después del ajuste final para commits inciertos se repitieron **36/36 casos de archivos en cada motor**, incluidos los 35 anteriores y el nuevo caso de confirmación perdida. No sumar 639+36: existe solapamiento. TRX completos: artifacts/private-files-full-pg17-efbb24f1dbc84a40b08f240b64774c64/paso26-pg17.trx y artifacts/private-files-full-pg18-4070a5b5217d496bb5a72a680dab2371/paso26.trx. TRX finales: artifacts/private-files-final-pg17-732290fc9e9a4325840f004a116de253/paso26-pg17.trx y artifacts/private-files-final-pg18-884921537fed4b4fbd90e26721e6c83c/paso26.trx. Release sin errores/advertencias; EF sin diferencias.
+- Aplicada únicamente 20261026183812_PrivateEvidenceFiles a openirp_dev (PostgreSQL 17.11, propietario openirp, 127.0.0.1:5433), tras respaldo completo restaurado/verificado y cotejo de conteos/historial. **18 migraciones**, datos previos conservados, ocho capacidades y tres categorías; tablas de negocio vacías, archivos/eventos nuevos vacíos. No se cargaron ejemplos ni se crearon cuentas. Evidencia/SQL/conteos/esquema: artifacts/private-evidence-files-dev-133ea5fec46d43a787de894c07bbb988/. Dump openirp_dev-before-private-evidence-files.dump, SHA256 **15493529627CDAEB35B35E4D20E0075CEBAE4A150F4C08812B4924243B66F3C1**. Este dump anterior a la migración no contiene binarios de filesystem; no había FILE registrados.
+- HTTPS con conexión local configurada: health/OpenAPI 200 y **51 operaciones** comprobadas de playbooks/ejecuciones/aprobaciones/evidencias/archivos presentes y con anónimos 401. Evidencia artifacts/private-evidence-files-http-591d18f7b4ae4a1792534332093a85c6/. Flujos autenticados, multipart, CSRF, descarga e integridad probados en bases/directorios temporales; las llamadas anónimas no prueban negocio autenticado sobre la base habitual.
+- MCP reindexado y Graphify AST actualizado según AGENTS.md: 2347 nodos, 6184 relaciones y 178 comunidades, con HTML local actualizado. Sin extracción semántica ni llamadas externas de IA. Resultados locales ignorados por Git y datos operativos excluidos.
+- API, contenedores y clústeres propios detenidos; servicios habituales y frontend preservados. Sin commit, push ni merge nuevos.
+
+Continúan RESTRICTED, retención/purga física y conciliación de staging desconocido, revisión de cuarentena/antimalware, omisiones/excepciones y riesgo residual, continuidad por seguridad, cierre integrado e IA supervisada.

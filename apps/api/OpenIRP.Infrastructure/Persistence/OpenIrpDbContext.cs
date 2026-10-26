@@ -28,11 +28,37 @@ public sealed class OpenIrpDbContext : IdentityDbContext<ApplicationUser, Identi
     public DbSet<IncidentCapabilityAssessment> IncidentCapabilityAssessments => Set<IncidentCapabilityAssessment>();
     public DbSet<IncidentEvent> IncidentEvents => Set<IncidentEvent>();
 
+    public DbSet<PlaybookExecution> PlaybookExecutions => Set<PlaybookExecution>();
+    public DbSet<ExecutionTask> ExecutionTasks => Set<ExecutionTask>();
+    public DbSet<EvidenceFile> EvidenceFiles => Set<EvidenceFile>();
+    public DbSet<EvidenceFileEvent> EvidenceFileEvents => Set<EvidenceFileEvent>();
+    public DbSet<IncidentEvidence> IncidentEvidence => Set<IncidentEvidence>();
+    public DbSet<EvidenceEvent> EvidenceEvents => Set<EvidenceEvent>();
+    public DbSet<StepApproval> StepApprovals => Set<StepApproval>();
+    public DbSet<ExecutionTaskEvent> ExecutionTaskEvents => Set<ExecutionTaskEvent>();
+
+    public DbSet<PlaybookReview> PlaybookReviews => Set<PlaybookReview>();
+    public DbSet<Playbook> Playbooks => Set<Playbook>();
+    public DbSet<PlaybookVersion> PlaybookVersions => Set<PlaybookVersion>();
+    public DbSet<PlaybookStep> PlaybookSteps => Set<PlaybookStep>();
+    public DbSet<PlaybookStepDependency> PlaybookStepDependencies => Set<PlaybookStepDependency>();
+    public DbSet<PlaybookCapabilityRequirement> PlaybookCapabilityRequirements => Set<PlaybookCapabilityRequirement>();
+
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
 
     private void CheckAuditChanges()
     {
         ChangeTracker.DetectChanges();
+        if (ChangeTracker.Entries<EvidenceFileEvent>().Any(e => e.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("File events are append-only.");
+        if (ChangeTracker.Entries<EvidenceEvent>().Any(e => e.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("Evidence events are append-only.");
+        if (ChangeTracker.Entries<StepApproval>().Any(e => e.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("Step approvals are append-only.");
+        if (ChangeTracker.Entries<ExecutionTaskEvent>().Any(e => e.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("Execution events are append-only.");
+        if (ChangeTracker.Entries<PlaybookReview>().Any(e => e.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("Playbook reviews are append-only.");
         if (ChangeTracker.Entries<AuditEvent>().Any(e => e.State is EntityState.Modified or EntityState.Deleted))
             throw new InvalidOperationException("Audit events are append-only.");
         if (ChangeTracker.Entries<IncidentEvent>().Any(e => e.State is EntityState.Modified or EntityState.Deleted))
@@ -63,6 +89,11 @@ public sealed class OpenIrpDbContext : IdentityDbContext<ApplicationUser, Identi
         IncidentMapping.Apply(builder);
         IncidentAssetMapping.Apply(builder);
         IncidentCapabilityMapping.Apply(builder);
+        PlaybookMapping.Apply(builder);
+        ExecutionMapping.Apply(builder);
+        StepApprovalMapping.Apply(builder);
+        EvidenceMapping.Apply(builder);
+        EvidenceFileMapping.Apply(builder);
     }
 
     private static void ConfigureAudit(ModelBuilder builder)

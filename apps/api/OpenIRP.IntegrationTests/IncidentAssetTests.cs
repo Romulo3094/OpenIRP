@@ -306,7 +306,7 @@ public sealed partial class IdentityAdministrationTests
     public async Task AssetMigrationPreservesExistingIncidentHistoryWhenAddingDetails()
     {
         var seed = await Seed();
-        var incident = await RegisterIncident(seed.Admin, seed.Org.Id);
+        var incident = await RegisterLegacyIncident(seed.Admin, seed.Org.Id);
         var before = (await Incidents(s => s.EventsAsync(seed.Admin, seed.Org.Id, incident.Id))).Items.Single();
         await InScope(async (_, db) =>
         {
@@ -325,7 +325,7 @@ public sealed partial class IdentityAdministrationTests
     public async Task AssetMigrationRefusesRollbackThatWouldLoseReportedHistory()
     {
         var seed = await Seed();
-        var incident = await RegisterIncident(seed.Admin, seed.Org.Id);
+        var incident = await RegisterLegacyIncident(seed.Admin, seed.Org.Id);
         await Incidents(s => s.ReportAssetAsync(seed.Admin, seed.Org.Id, incident.Id, Reported()));
         var error = await Assert.ThrowsAsync<PostgresException>(() => InScope(async (_, db) =>
         {

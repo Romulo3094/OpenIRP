@@ -11,7 +11,7 @@ using OpenIRP.Infrastructure.Persistence;
 
 namespace OpenIRP.Infrastructure.Incidents;
 
-public sealed partial class IncidentService(OpenIrpDbContext db, AuditRecorder audit, AuditContext context) : IIncidentService
+public sealed partial class IncidentService(OpenIrpDbContext db, AuditRecorder audit, AuditContext context, IPrivateEvidenceStore files) : IIncidentService, IEvidenceService, IFileEvidenceService, OpenIRP.Application.Executions.IExecutionService
 {
     private static IdentityOperationException Error(int status, string code) => new(status, code);
 
@@ -28,14 +28,31 @@ public sealed partial class IncidentService(OpenIrpDbContext db, AuditRecorder a
             await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(1869636978, 26)", ct);
             await AuthorizeAsync(actor, organization, true, ct);
             var (entity, reason) = await operation();
+            ValidateWorkflowMutation(entity, action, actor);
+            await ValidateExecutionContextAsync(entity, ct);
+            // Changing the affected asset context requires a new explicit criticality assessment.
+            if (action is "ASSET_REPORTED" or "ASSET_ATTACHED" or "ASSET_LINKED")
+            {
+                entity.AssessedCriticality = null;
+                entity.CriticalityAssessedAtRevision = null;
+            }
+            var eventDetails = CalculateSeverity(entity, action, details?.Invoke() ?? "{}");
             db.IncidentEvents.Add(new()
             {
                 OrganizationId = organization, IncidentId = entity.Id, Revision = entity.Revision,
                 ActorUserId = actor, CorrelationId = context.CorrelationId, Action = action, Reason = reason,
                 CategoryId = entity.CategoryId, Title = entity.Title, Description = entity.Description,
-                Status = entity.Status, AssignedMembershipId = entity.AssignedMembershipId, DetailsJson = details?.Invoke() ?? "{}",
+                Status = entity.Status, AssignedMembershipId = entity.AssignedMembershipId, DetailsJson = eventDetails,
                 ConfidentialityImpact = entity.ConfidentialityImpact, IntegrityImpact = entity.IntegrityImpact,
-                AvailabilityImpact = entity.AvailabilityImpact
+                AvailabilityImpact = entity.AvailabilityImpact, Scope = entity.Scope, OperationalImpact = entity.OperationalImpact,
+                AssessedCriticality = entity.AssessedCriticality, CriticalityAssessedAtRevision = entity.CriticalityAssessedAtRevision,
+                Severity = entity.Severity, MaximumSeverityReached = entity.MaximumSeverityReached,
+                SeverityRuleVersion = entity.SeverityRuleVersion, SeverityAssessedAtRevision = entity.SeverityAssessedAtRevision,
+                Resolution = entity.Resolution, ClosureRequestId = entity.ClosureRequestId,
+                ClosureRequestRevision = entity.ClosureRequestRevision, ClosureRequestedByUserId = entity.ClosureRequestedByUserId,
+                ClosureReviewStatus = entity.ClosureReviewStatus, ClosureDecidedByUserId = entity.ClosureDecidedByUserId,
+                ClosureDecisionRevision = entity.ClosureDecisionRevision, ClosureSelfApproval = entity.ClosureSelfApproval,
+                ClosureSelfApprovalJustification = entity.ClosureSelfApprovalJustification
             });
             db.AuditEvents.Add(audit.Success(attempt with { ResourceId = entity.Id },
                 JsonSerializer.Serialize(new { entity.Revision, entity.CategoryId, entity.AssignedMembershipId })));
@@ -137,7 +154,7 @@ public sealed partial class IncidentService(OpenIrpDbContext db, AuditRecorder a
                 .OrderBy(e => e.Revision).Take(limit + 1).ToListAsync(ct);
             var more = rows.Count > limit;
             var items = rows.Take(limit).Select(e => new IncidentEventItem(e.Id, e.IncidentId, e.Revision, e.ActorUserId, e.CorrelationId,
-                e.Action, e.Reason, e.CategoryId, e.Title, e.Description, e.Status, e.AssignedMembershipId, e.OccurredAt, JsonSerializer.Deserialize<JsonElement>(e.DetailsJson), e.ConfidentialityImpact, e.IntegrityImpact, e.AvailabilityImpact)).ToList();
+                e.Action, e.Reason, e.CategoryId, e.Title, e.Description, e.Status, e.AssignedMembershipId, e.OccurredAt, JsonSerializer.Deserialize<JsonElement>(e.DetailsJson), e.ConfidentialityImpact, e.IntegrityImpact, e.AvailabilityImpact, e.Scope, e.OperationalImpact, e.AssessedCriticality, e.CriticalityAssessedAtRevision, e.Severity, e.MaximumSeverityReached, e.SeverityRuleVersion, e.SeverityAssessedAtRevision, e.Resolution, ClosureView(e.ClosureRequestId, e.ClosureRequestRevision, e.ClosureRequestedByUserId, e.ClosureReviewStatus, e.ClosureDecidedByUserId, e.ClosureDecisionRevision, e.ClosureSelfApproval, e.ClosureSelfApprovalJustification))).ToList();
             return new IncidentEventPage(items, more ? items[^1].Revision : null);
         }, ct);
 
@@ -160,5 +177,5 @@ public sealed partial class IncidentService(OpenIrpDbContext db, AuditRecorder a
         if (entity.Revision != expected || entity.Revision == long.MaxValue) throw Error(409, "stale_incident_revision");
         entity.Revision++;
     }
-    private static IncidentItem View(Incident e) => new(e.Id, e.OrganizationId, e.CategoryId, e.Title, e.Description, e.Status, e.AssignedMembershipId, e.Revision, e.CreatedAt, e.ConfidentialityImpact, e.IntegrityImpact, e.AvailabilityImpact);
+    private static IncidentItem View(Incident e) => new(e.Id, e.OrganizationId, e.CategoryId, e.Title, e.Description, e.Status, e.AssignedMembershipId, e.Revision, e.CreatedAt, e.ConfidentialityImpact, e.IntegrityImpact, e.AvailabilityImpact, e.Scope, e.OperationalImpact, e.AssessedCriticality, e.CriticalityAssessedAtRevision, e.Severity, e.MaximumSeverityReached, e.SeverityRuleVersion, e.SeverityAssessedAtRevision, e.Resolution, ClosureView(e.ClosureRequestId, e.ClosureRequestRevision, e.ClosureRequestedByUserId, e.ClosureReviewStatus, e.ClosureDecidedByUserId, e.ClosureDecisionRevision, e.ClosureSelfApproval, e.ClosureSelfApprovalJustification));
 }

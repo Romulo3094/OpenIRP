@@ -458,11 +458,405 @@ namespace OpenIRP.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("OpenIRP.Domain.Entities.EvidenceEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("action");
+
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_user_id");
+
+                    b.Property<Guid>("CorrelationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("correlation_id");
+
+                    b.Property<Guid>("EvidenceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("evidence_id");
+
+                    b.Property<Guid>("IncidentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("incident_id");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("reason");
+
+                    b.Property<long>("Revision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.HasKey("Id")
+                        .HasName("pk_evidence_events");
+
+                    b.HasIndex("ActorUserId")
+                        .HasDatabaseName("ix_evidence_events_actor_user_id");
+
+                    b.HasIndex("EvidenceId", "Revision")
+                        .IsUnique()
+                        .HasDatabaseName("ix_evidence_events_evidence_id_revision");
+
+                    b.HasIndex("OrganizationId", "IncidentId", "EvidenceId")
+                        .HasDatabaseName("ix_evidence_events_organization_id_incident_id_evidence_id");
+
+                    b.ToTable("evidence_events", "app", t =>
+                        {
+                            t.HasCheckConstraint("ck_evidence_event", "(action='REGISTERED' AND revision=1 OR action='WITHDRAWN' AND revision=2) AND btrim(reason)<>''");
+                        });
+                });
+
+            modelBuilder.Entity("OpenIRP.Domain.Entities.EvidenceFile", b =>
+                {
+                    b.Property<Guid>("EvidenceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("evidence_id");
+
+                    b.Property<DateTimeOffset>("ChangedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("changed_at");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("content_type");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("FailureCode")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("failure_code");
+
+                    b.Property<Guid>("IncidentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("incident_id");
+
+                    b.Property<long>("Length")
+                        .HasColumnType("bigint")
+                        .HasColumnName("length");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<string>("OriginalName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("original_name");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("sha256");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("state");
+
+                    b.Property<Guid>("StorageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("storage_id");
+
+                    b.HasKey("EvidenceId")
+                        .HasName("pk_evidence_files");
+
+                    b.HasAlternateKey("OrganizationId", "IncidentId", "EvidenceId")
+                        .HasName("ak_evidence_files_organization_id_incident_id_evidence_id");
+
+                    b.HasIndex("StorageId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_evidence_files_storage_id");
+
+                    b.ToTable("evidence_files", "app", t =>
+                        {
+                            t.HasCheckConstraint("ck_file_metadata", "length>0 AND length<=10485760 AND sha256 ~ '^[0-9a-f]{64}$' AND btrim(original_name)<>'' AND content_type IN ('application/pdf','image/png','image/jpeg','text/plain')");
+
+                            t.HasCheckConstraint("ck_file_state", "revision>0 AND changed_at>=created_at AND ((state IN ('PENDING','AVAILABLE') AND failure_code IS NULL) OR (state IN ('FAILED','QUARANTINED') AND failure_code IN ('missing_file','storage_commit_failed','integrity_check_failed','unsafe_storage_path','withdrawn')))");
+                        });
+                });
+
+            modelBuilder.Entity("OpenIRP.Domain.Entities.EvidenceFileEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_user_id");
+
+                    b.Property<Guid>("CorrelationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("correlation_id");
+
+                    b.Property<Guid>("EvidenceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("evidence_id");
+
+                    b.Property<string>("FailureCode")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("failure_code");
+
+                    b.Property<Guid>("IncidentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("incident_id");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("reason");
+
+                    b.Property<long>("Revision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("state");
+
+                    b.HasKey("Id")
+                        .HasName("pk_evidence_file_events");
+
+                    b.HasIndex("ActorUserId")
+                        .HasDatabaseName("ix_evidence_file_events_actor_user_id");
+
+                    b.HasIndex("EvidenceId", "Revision")
+                        .IsUnique()
+                        .HasDatabaseName("ix_evidence_file_events_evidence_id_revision");
+
+                    b.HasIndex("OrganizationId", "IncidentId", "EvidenceId")
+                        .HasDatabaseName("ix_evidence_file_events_organization_id_incident_id_evidence_id");
+
+                    b.ToTable("evidence_file_events", "app", t =>
+                        {
+                            t.HasCheckConstraint("ck_file_event", "revision>0 AND btrim(reason)<>'' AND state IN ('PENDING','AVAILABLE','FAILED','QUARANTINED')");
+                        });
+                });
+
+            modelBuilder.Entity("OpenIRP.Domain.Entities.ExecutionTask", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("AssignedMembershipId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("assigned_membership_id");
+
+                    b.Property<long>("ChangedAtRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("changed_at_revision");
+
+                    b.Property<Guid?>("CompletionEvidenceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("completion_evidence_id");
+
+                    b.Property<Guid>("ExecutionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("execution_id");
+
+                    b.Property<Guid>("IncidentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("incident_id");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("StepId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("step_id");
+
+                    b.Property<Guid>("VersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("version_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_execution_tasks");
+
+                    b.HasAlternateKey("OrganizationId", "IncidentId", "VersionId", "ExecutionId", "Id")
+                        .HasName("ak_execution_tasks_organization_id_incident_id_version_id_exec");
+
+                    b.HasIndex("ExecutionId", "StepId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_execution_tasks_execution_id_step_id");
+
+                    b.HasIndex("OrganizationId", "AssignedMembershipId")
+                        .HasDatabaseName("ix_execution_tasks_organization_id_assigned_membership_id");
+
+                    b.HasIndex("VersionId", "StepId")
+                        .HasDatabaseName("ix_execution_tasks_version_id_step_id");
+
+                    b.HasIndex("OrganizationId", "IncidentId", "CompletionEvidenceId")
+                        .HasDatabaseName("ix_execution_tasks_organization_id_incident_id_completion_evid");
+
+                    b.ToTable("execution_tasks", "app", t =>
+                        {
+                            t.HasCheckConstraint("ck_execution_task_revision", "changed_at_revision > 0");
+
+                            t.HasCheckConstraint("ck_execution_task_status", "status IN ('PENDING','IN_PROGRESS','BLOCKED','COMPLETED')");
+
+                            t.HasCheckConstraint("ck_task_completion_evidence", "completion_evidence_id IS NULL OR status='COMPLETED'");
+                        });
+                });
+
+            modelBuilder.Entity("OpenIRP.Domain.Entities.ExecutionTaskEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("action");
+
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_user_id");
+
+                    b.Property<Guid?>("AssignedMembershipId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("assigned_membership_id");
+
+                    b.Property<Guid>("CorrelationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("correlation_id");
+
+                    b.Property<Guid>("ExecutionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("execution_id");
+
+                    b.Property<string>("ExecutionStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("execution_status");
+
+                    b.Property<Guid>("IncidentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("incident_id");
+
+                    b.Property<long>("IncidentRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("incident_revision");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("reason");
+
+                    b.Property<long>("Revision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.Property<Guid?>("TaskId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("task_id");
+
+                    b.Property<string>("TaskStatus")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("task_status");
+
+                    b.Property<Guid>("VersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("version_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_execution_task_events");
+
+                    b.HasIndex("ActorUserId")
+                        .HasDatabaseName("ix_execution_task_events_actor_user_id");
+
+                    b.HasIndex("ExecutionId", "Revision")
+                        .IsUnique()
+                        .HasDatabaseName("ix_execution_task_events_execution_id_revision");
+
+                    b.HasIndex("OrganizationId", "AssignedMembershipId")
+                        .HasDatabaseName("ix_execution_task_events_organization_id_assigned_membership_id");
+
+                    b.HasIndex("OrganizationId", "IncidentId", "VersionId", "ExecutionId", "TaskId")
+                        .HasDatabaseName("ix_execution_task_events_organization_id_incident_id_version_i");
+
+                    b.ToTable("execution_task_events", "app", t =>
+                        {
+                            t.HasCheckConstraint("ck_execution_event_action", "action IN ('EXECUTION_STARTED','EXECUTION_TASK_ASSIGNED','EXECUTION_TASK_CHANGED','STEP_APPROVAL_REQUESTED','STEP_APPROVAL_APPROVED','STEP_APPROVAL_REJECTED','EXECUTION_COMPLETED','EXECUTION_CANCELLED')");
+
+                            t.HasCheckConstraint("ck_execution_event_task", "(task_id IS NULL AND task_status IS NULL AND assigned_membership_id IS NULL AND action IN ('EXECUTION_STARTED','EXECUTION_COMPLETED','EXECUTION_CANCELLED')) OR (task_id IS NOT NULL AND task_status IS NOT NULL AND task_status IN ('PENDING','IN_PROGRESS','BLOCKED','COMPLETED') AND action IN ('EXECUTION_TASK_ASSIGNED','EXECUTION_TASK_CHANGED','STEP_APPROVAL_REQUESTED','STEP_APPROVAL_APPROVED','STEP_APPROVAL_REJECTED'))");
+
+                            t.HasCheckConstraint("ck_execution_event_values", "revision > 0 AND incident_revision > 0 AND btrim(reason)<>'' AND execution_status IN ('IN_PROGRESS','COMPLETED','CANCELLED')");
+                        });
+                });
+
             modelBuilder.Entity("OpenIRP.Domain.Entities.Incident", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
                         .HasColumnName("id");
+
+                    b.Property<string>("AssessedCriticality")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("assessed_criticality");
 
                     b.Property<Guid?>("AssignedMembershipId")
                         .HasColumnType("uuid")
@@ -477,6 +871,40 @@ namespace OpenIRP.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("category_id");
 
+                    b.Property<Guid?>("ClosureDecidedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("closure_decided_by_user_id");
+
+                    b.Property<long?>("ClosureDecisionRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("closure_decision_revision");
+
+                    b.Property<Guid?>("ClosureRequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("closure_request_id");
+
+                    b.Property<long?>("ClosureRequestRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("closure_request_revision");
+
+                    b.Property<Guid?>("ClosureRequestedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("closure_requested_by_user_id");
+
+                    b.Property<string>("ClosureReviewStatus")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("closure_review_status");
+
+                    b.Property<bool?>("ClosureSelfApproval")
+                        .HasColumnType("boolean")
+                        .HasColumnName("closure_self_approval");
+
+                    b.Property<string>("ClosureSelfApprovalJustification")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("closure_self_approval_justification");
+
                     b.Property<string>("ConfidentialityImpact")
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)")
@@ -485,6 +913,10 @@ namespace OpenIRP.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
+
+                    b.Property<long?>("CriticalityAssessedAtRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("criticality_assessed_at_revision");
 
                     b.Property<string>("Description")
                         .HasMaxLength(4000)
@@ -496,14 +928,48 @@ namespace OpenIRP.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(10)")
                         .HasColumnName("integrity_impact");
 
+                    b.Property<string>("MaximumSeverityReached")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("maximum_severity_reached");
+
+                    b.Property<string>("OperationalImpact")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("operational_impact");
+
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid")
                         .HasColumnName("organization_id");
+
+                    b.Property<string>("Resolution")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("resolution");
 
                     b.Property<long>("Revision")
                         .IsConcurrencyToken()
                         .HasColumnType("bigint")
                         .HasColumnName("revision");
+
+                    b.Property<string>("Scope")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("scope");
+
+                    b.Property<string>("Severity")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("severity");
+
+                    b.Property<long?>("SeverityAssessedAtRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("severity_assessed_at_revision");
+
+                    b.Property<string>("SeverityRuleVersion")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("severity_rule_version");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -526,6 +992,16 @@ namespace OpenIRP.Infrastructure.Persistence.Migrations
                     b.HasIndex("CategoryId")
                         .HasDatabaseName("ix_incidents_category_id");
 
+                    b.HasIndex("ClosureDecidedByUserId")
+                        .HasDatabaseName("ix_incidents_closure_decided_by_user_id");
+
+                    b.HasIndex("ClosureRequestId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_incidents_closure_request_id");
+
+                    b.HasIndex("ClosureRequestedByUserId")
+                        .HasDatabaseName("ix_incidents_closure_requested_by_user_id");
+
                     b.HasIndex("OrganizationId", "AssignedMembershipId")
                         .HasDatabaseName("ix_incidents_organization_id_assigned_membership_id");
 
@@ -533,9 +1009,19 @@ namespace OpenIRP.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_incident_cia", "(confidentiality_impact IS NULL OR confidentiality_impact IN ('NONE','LOW','MEDIUM','HIGH')) AND (integrity_impact IS NULL OR integrity_impact IN ('NONE','LOW','MEDIUM','HIGH')) AND (availability_impact IS NULL OR availability_impact IN ('NONE','LOW','MEDIUM','HIGH'))");
 
+                            t.HasCheckConstraint("ck_incident_closure", "((closure_request_id IS NULL AND closure_request_revision IS NULL AND closure_requested_by_user_id IS NULL AND closure_review_status IS NULL AND closure_decided_by_user_id IS NULL AND closure_decision_revision IS NULL AND closure_self_approval IS NULL AND closure_self_approval_justification IS NULL) OR (closure_request_id IS NOT NULL AND closure_request_revision IS NOT NULL AND closure_request_revision > 1 AND closure_request_revision <= revision AND closure_requested_by_user_id IS NOT NULL AND closure_review_status IS NOT NULL AND closure_review_status IN ('PENDING','APPROVED','REJECTED','INVALIDATED') AND ((closure_review_status = 'PENDING' AND status = 'RESOLVED' AND closure_request_revision = revision AND closure_decided_by_user_id IS NULL AND closure_decision_revision IS NULL AND closure_self_approval IS NULL AND closure_self_approval_justification IS NULL) OR (closure_review_status <> 'PENDING' AND closure_decided_by_user_id IS NOT NULL AND closure_decision_revision IS NOT NULL AND closure_decision_revision > closure_request_revision AND closure_decision_revision <= revision AND closure_self_approval IS NOT NULL AND (closure_review_status <> 'APPROVED' OR status = 'CLOSED') AND ((closure_self_approval = TRUE AND closure_review_status = 'APPROVED' AND closure_decided_by_user_id = closure_requested_by_user_id AND closure_self_approval_justification IS NOT NULL AND btrim(closure_self_approval_justification) <> '') OR (closure_self_approval = FALSE AND closure_self_approval_justification IS NULL AND (closure_review_status <> 'APPROVED' OR closure_decided_by_user_id <> closure_requested_by_user_id)))))))");
+
+                            t.HasCheckConstraint("ck_incident_context", "(scope IS NULL OR scope IN ('SINGLE','MULTIPLE','ORGANIZATIONWIDE')) AND (operational_impact IS NULL OR operational_impact IN ('NONE','DEGRADED','MAJORINTERRUPTION','CRITICALINTERRUPTION'))");
+
+                            t.HasCheckConstraint("ck_incident_criticality", "(assessed_criticality IS NULL OR assessed_criticality IN ('NOTAPPLICABLE','LOW','MEDIUM','HIGH')) AND (criticality_assessed_at_revision IS NULL OR (criticality_assessed_at_revision > 1 AND criticality_assessed_at_revision <= revision)) AND (assessed_criticality IS NULL OR criticality_assessed_at_revision IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_incident_lifecycle", "(resolution IS NULL OR btrim(resolution) <> '') AND (status NOT IN ('RESOLVED','CLOSED') OR resolution IS NOT NULL) AND (status <> 'CLOSED' OR (severity IS NOT NULL AND maximum_severity_reached IS NOT NULL AND severity_rule_version IS NOT NULL AND assigned_membership_id IS NOT NULL AND (maximum_severity_reached IN ('LOW','MEDIUM') OR (maximum_severity_reached IN ('HIGH','CRITICAL') AND closure_review_status IS NOT NULL AND closure_review_status = 'APPROVED' AND closure_decision_revision = revision))))");
+
                             t.HasCheckConstraint("ck_incident_revision", "revision > 0");
 
-                            t.HasCheckConstraint("ck_incident_status", "status = 'REGISTERED'");
+                            t.HasCheckConstraint("ck_incident_severity", "(severity IS NULL OR severity IN ('LOW','MEDIUM','HIGH','CRITICAL')) AND (maximum_severity_reached IS NULL OR maximum_severity_reached IN ('LOW','MEDIUM','HIGH','CRITICAL')) AND (severity IS NULL OR (maximum_severity_reached IS NOT NULL AND (CASE maximum_severity_reached WHEN 'LOW' THEN 1 WHEN 'MEDIUM' THEN 2 WHEN 'HIGH' THEN 3 WHEN 'CRITICAL' THEN 4 END) >= (CASE severity WHEN 'LOW' THEN 1 WHEN 'MEDIUM' THEN 2 WHEN 'HIGH' THEN 3 WHEN 'CRITICAL' THEN 4 END))) AND ((severity_rule_version IS NULL AND severity IS NULL AND maximum_severity_reached IS NULL AND severity_assessed_at_revision IS NULL) OR (severity_rule_version IS NOT NULL AND severity_rule_version = 'openirp-severity-v1' AND severity_assessed_at_revision IS NOT NULL AND severity_assessed_at_revision > 0 AND severity_assessed_at_revision <= revision))");
+
+                            t.HasCheckConstraint("ck_incident_status", "status IN ('REGISTERED','UNDER_EVALUATION','IN_RESPONSE','RESOLVED','CLOSED','DISCARDED')");
 
                             t.HasCheckConstraint("ck_incident_title", "btrim(title) <> ''");
                         });
@@ -782,6 +1268,11 @@ namespace OpenIRP.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("actor_user_id");
 
+                    b.Property<string>("AssessedCriticality")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("assessed_criticality");
+
                     b.Property<Guid?>("AssignedMembershipId")
                         .HasColumnType("uuid")
                         .HasColumnName("assigned_membership_id");
@@ -795,6 +1286,40 @@ namespace OpenIRP.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("category_id");
 
+                    b.Property<Guid?>("ClosureDecidedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("closure_decided_by_user_id");
+
+                    b.Property<long?>("ClosureDecisionRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("closure_decision_revision");
+
+                    b.Property<Guid?>("ClosureRequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("closure_request_id");
+
+                    b.Property<long?>("ClosureRequestRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("closure_request_revision");
+
+                    b.Property<Guid?>("ClosureRequestedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("closure_requested_by_user_id");
+
+                    b.Property<string>("ClosureReviewStatus")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("closure_review_status");
+
+                    b.Property<bool?>("ClosureSelfApproval")
+                        .HasColumnType("boolean")
+                        .HasColumnName("closure_self_approval");
+
+                    b.Property<string>("ClosureSelfApprovalJustification")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("closure_self_approval_justification");
+
                     b.Property<string>("ConfidentialityImpact")
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)")
@@ -803,6 +1328,10 @@ namespace OpenIRP.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("CorrelationId")
                         .HasColumnType("uuid")
                         .HasColumnName("correlation_id");
+
+                    b.Property<long?>("CriticalityAssessedAtRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("criticality_assessed_at_revision");
 
                     b.Property<string>("Description")
                         .HasMaxLength(4000)
@@ -825,9 +1354,19 @@ namespace OpenIRP.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(10)")
                         .HasColumnName("integrity_impact");
 
+                    b.Property<string>("MaximumSeverityReached")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("maximum_severity_reached");
+
                     b.Property<DateTimeOffset>("OccurredAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("occurred_at");
+
+                    b.Property<string>("OperationalImpact")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("operational_impact");
 
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid")
@@ -838,9 +1377,33 @@ namespace OpenIRP.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(2000)")
                         .HasColumnName("reason");
 
+                    b.Property<string>("Resolution")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("resolution");
+
                     b.Property<long>("Revision")
                         .HasColumnType("bigint")
                         .HasColumnName("revision");
+
+                    b.Property<string>("Scope")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("scope");
+
+                    b.Property<string>("Severity")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("severity");
+
+                    b.Property<long?>("SeverityAssessedAtRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("severity_assessed_at_revision");
+
+                    b.Property<string>("SeverityRuleVersion")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("severity_rule_version");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -863,6 +1426,12 @@ namespace OpenIRP.Infrastructure.Persistence.Migrations
                     b.HasIndex("CategoryId")
                         .HasDatabaseName("ix_incident_events_category_id");
 
+                    b.HasIndex("ClosureDecidedByUserId")
+                        .HasDatabaseName("ix_incident_events_closure_decided_by_user_id");
+
+                    b.HasIndex("ClosureRequestedByUserId")
+                        .HasDatabaseName("ix_incident_events_closure_requested_by_user_id");
+
                     b.HasIndex("OrganizationId", "AssignedMembershipId")
                         .HasDatabaseName("ix_incident_events_organization_id_assigned_membership_id");
 
@@ -872,17 +1441,140 @@ namespace OpenIRP.Infrastructure.Persistence.Migrations
 
                     b.ToTable("incident_events", "app", t =>
                         {
-                            t.HasCheckConstraint("ck_incident_event_action", "(action = 'REGISTERED' AND revision = 1 AND reason IS NULL) OR (action IN ('UPDATED','ASSIGNED','ASSET_REPORTED','ASSET_ATTACHED','ASSET_LINKED','CAPABILITY_ASSESSED','CAPABILITY_INHERITED','IMPACT_ASSESSED') AND revision > 1 AND reason IS NOT NULL AND btrim(reason) <> '')");
+                            t.HasCheckConstraint("ck_incident_event_action", "(action = 'REGISTERED' AND revision = 1 AND reason IS NULL) OR (action IN ('UPDATED','ASSIGNED','ASSET_REPORTED','ASSET_ATTACHED','ASSET_LINKED','CAPABILITY_ASSESSED','CAPABILITY_INHERITED','IMPACT_ASSESSED','CONTEXT_ASSESSED','CRITICALITY_ASSESSED','SEVERITY_ASSESSED','STATE_CHANGED','CLOSURE_REQUESTED','CLOSURE_APPROVED','CLOSURE_REJECTED','EVIDENCE_REGISTERED','EXECUTION_STARTED','EXECUTION_TASK_ASSIGNED','EXECUTION_TASK_CHANGED','STEP_APPROVAL_REQUESTED','STEP_APPROVAL_APPROVED','STEP_APPROVAL_REJECTED','EXECUTION_COMPLETED','EXECUTION_CANCELLED') AND revision > 1 AND reason IS NOT NULL AND btrim(reason) <> '')");
 
                             t.HasCheckConstraint("ck_incident_event_cia", "(confidentiality_impact IS NULL OR confidentiality_impact IN ('NONE','LOW','MEDIUM','HIGH')) AND (integrity_impact IS NULL OR integrity_impact IN ('NONE','LOW','MEDIUM','HIGH')) AND (availability_impact IS NULL OR availability_impact IN ('NONE','LOW','MEDIUM','HIGH'))");
 
+                            t.HasCheckConstraint("ck_incident_event_closure", "((closure_request_id IS NULL AND closure_request_revision IS NULL AND closure_requested_by_user_id IS NULL AND closure_review_status IS NULL AND closure_decided_by_user_id IS NULL AND closure_decision_revision IS NULL AND closure_self_approval IS NULL AND closure_self_approval_justification IS NULL) OR (closure_request_id IS NOT NULL AND closure_request_revision IS NOT NULL AND closure_request_revision > 1 AND closure_request_revision <= revision AND closure_requested_by_user_id IS NOT NULL AND closure_review_status IS NOT NULL AND closure_review_status IN ('PENDING','APPROVED','REJECTED','INVALIDATED') AND ((closure_review_status = 'PENDING' AND status = 'RESOLVED' AND closure_request_revision = revision AND closure_decided_by_user_id IS NULL AND closure_decision_revision IS NULL AND closure_self_approval IS NULL AND closure_self_approval_justification IS NULL) OR (closure_review_status <> 'PENDING' AND closure_decided_by_user_id IS NOT NULL AND closure_decision_revision IS NOT NULL AND closure_decision_revision > closure_request_revision AND closure_decision_revision <= revision AND closure_self_approval IS NOT NULL AND (closure_review_status <> 'APPROVED' OR status = 'CLOSED') AND ((closure_self_approval = TRUE AND closure_review_status = 'APPROVED' AND closure_decided_by_user_id = closure_requested_by_user_id AND closure_self_approval_justification IS NOT NULL AND btrim(closure_self_approval_justification) <> '') OR (closure_self_approval = FALSE AND closure_self_approval_justification IS NULL AND (closure_review_status <> 'APPROVED' OR closure_decided_by_user_id <> closure_requested_by_user_id)))))))");
+
+                            t.HasCheckConstraint("ck_incident_event_context", "(scope IS NULL OR scope IN ('SINGLE','MULTIPLE','ORGANIZATIONWIDE')) AND (operational_impact IS NULL OR operational_impact IN ('NONE','DEGRADED','MAJORINTERRUPTION','CRITICALINTERRUPTION'))");
+
+                            t.HasCheckConstraint("ck_incident_event_criticality", "(assessed_criticality IS NULL OR assessed_criticality IN ('NOTAPPLICABLE','LOW','MEDIUM','HIGH')) AND (criticality_assessed_at_revision IS NULL OR (criticality_assessed_at_revision > 1 AND criticality_assessed_at_revision <= revision)) AND (assessed_criticality IS NULL OR criticality_assessed_at_revision IS NOT NULL)");
+
                             t.HasCheckConstraint("ck_incident_event_details", "jsonb_typeof(details_json) = 'object' AND octet_length(details_json::text) <= 32768");
+
+                            t.HasCheckConstraint("ck_incident_event_lifecycle", "(resolution IS NULL OR btrim(resolution) <> '') AND (status NOT IN ('RESOLVED','CLOSED') OR resolution IS NOT NULL) AND (status <> 'CLOSED' OR (severity IS NOT NULL AND maximum_severity_reached IS NOT NULL AND severity_rule_version IS NOT NULL AND assigned_membership_id IS NOT NULL AND (maximum_severity_reached IN ('LOW','MEDIUM') OR (maximum_severity_reached IN ('HIGH','CRITICAL') AND closure_review_status IS NOT NULL AND closure_review_status = 'APPROVED' AND closure_decision_revision = revision))))");
 
                             t.HasCheckConstraint("ck_incident_event_revision", "revision > 0");
 
-                            t.HasCheckConstraint("ck_incident_event_status", "status = 'REGISTERED'");
+                            t.HasCheckConstraint("ck_incident_event_severity", "(severity IS NULL OR severity IN ('LOW','MEDIUM','HIGH','CRITICAL')) AND (maximum_severity_reached IS NULL OR maximum_severity_reached IN ('LOW','MEDIUM','HIGH','CRITICAL')) AND (severity IS NULL OR (maximum_severity_reached IS NOT NULL AND (CASE maximum_severity_reached WHEN 'LOW' THEN 1 WHEN 'MEDIUM' THEN 2 WHEN 'HIGH' THEN 3 WHEN 'CRITICAL' THEN 4 END) >= (CASE severity WHEN 'LOW' THEN 1 WHEN 'MEDIUM' THEN 2 WHEN 'HIGH' THEN 3 WHEN 'CRITICAL' THEN 4 END))) AND ((severity_rule_version IS NULL AND severity IS NULL AND maximum_severity_reached IS NULL AND severity_assessed_at_revision IS NULL) OR (severity_rule_version IS NOT NULL AND severity_rule_version = 'openirp-severity-v1' AND severity_assessed_at_revision IS NOT NULL AND severity_assessed_at_revision > 0 AND severity_assessed_at_revision <= revision))");
+
+                            t.HasCheckConstraint("ck_incident_event_status", "status IN ('REGISTERED','UNDER_EVALUATION','IN_RESPONSE','RESOLVED','CLOSED','DISCARDED')");
 
                             t.HasCheckConstraint("ck_incident_event_title", "btrim(title) <> ''");
+                        });
+                });
+
+            modelBuilder.Entity("OpenIRP.Domain.Entities.IncidentEvidence", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Classification")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("classification");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasMaxLength(16000)
+                        .HasColumnType("character varying(16000)")
+                        .HasColumnName("content");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<Guid?>("ExecutionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("execution_id");
+
+                    b.Property<Guid>("IncidentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("incident_id");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid?>("TaskId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("task_id");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("title");
+
+                    b.Property<Guid?>("VersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("version_id");
+
+                    b.Property<string>("WithdrawalReason")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("withdrawal_reason");
+
+                    b.Property<DateTimeOffset?>("WithdrawnAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("withdrawn_at");
+
+                    b.Property<Guid?>("WithdrawnByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("withdrawn_by_user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_incident_evidence");
+
+                    b.HasAlternateKey("OrganizationId", "IncidentId", "Id")
+                        .HasName("ak_incident_evidence_organization_id_incident_id_id");
+
+                    b.HasIndex("CreatedByUserId")
+                        .HasDatabaseName("ix_incident_evidence_created_by_user_id");
+
+                    b.HasIndex("WithdrawnByUserId")
+                        .HasDatabaseName("ix_incident_evidence_withdrawn_by_user_id");
+
+                    b.HasIndex("TaskId", "Status")
+                        .HasDatabaseName("ix_incident_evidence_task_id_status");
+
+                    b.HasIndex("OrganizationId", "IncidentId", "Id")
+                        .HasDatabaseName("ix_incident_evidence_organization_id_incident_id_id");
+
+                    b.HasIndex("OrganizationId", "IncidentId", "VersionId", "ExecutionId", "TaskId")
+                        .HasDatabaseName("ix_incident_evidence_organization_id_incident_id_version_id_ex");
+
+                    b.ToTable("incident_evidence", "app", t =>
+                        {
+                            t.HasCheckConstraint("ck_evidence_content", "kind IN ('TEXT','REFERENCE','FILE') AND classification IN ('INTERNAL','CONFIDENTIAL') AND btrim(title)<>'' AND btrim(content)<>'' AND (kind<>'REFERENCE' OR (length(content)<=2048 AND content ~ '^https://'))");
+
+                            t.HasCheckConstraint("ck_evidence_lifecycle", "(status='ACTIVE' AND revision=1 AND withdrawn_by_user_id IS NULL AND withdrawn_at IS NULL AND withdrawal_reason IS NULL) OR (status='WITHDRAWN' AND revision=2 AND withdrawn_by_user_id IS NOT NULL AND withdrawn_at IS NOT NULL AND withdrawn_at>=created_at AND withdrawal_reason IS NOT NULL AND btrim(withdrawal_reason)<>'')");
+
+                            t.HasCheckConstraint("ck_evidence_task_scope", "(version_id IS NULL AND execution_id IS NULL AND task_id IS NULL) OR (version_id IS NOT NULL AND execution_id IS NOT NULL AND task_id IS NOT NULL)");
                         });
                 });
 
@@ -1108,6 +1800,598 @@ namespace OpenIRP.Infrastructure.Persistence.Migrations
                     b.ToTable("platform_administrators", "app");
                 });
 
+            modelBuilder.Entity("OpenIRP.Domain.Entities.Playbook", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("category_id");
+
+                    b.Property<string>("CloneReason")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("clone_reason");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<Guid?>("CurrentPublishedVersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("current_published_version_id");
+
+                    b.Property<Guid?>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.Property<long?>("SourceRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("source_revision");
+
+                    b.Property<Guid?>("SourceVersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_version_id");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("title");
+
+                    b.HasKey("Id")
+                        .HasName("pk_playbooks");
+
+                    b.HasIndex("CategoryId")
+                        .HasDatabaseName("ix_playbooks_category_id");
+
+                    b.HasIndex("CreatedByUserId")
+                        .HasDatabaseName("ix_playbooks_created_by_user_id");
+
+                    b.HasIndex("SourceVersionId")
+                        .HasDatabaseName("ix_playbooks_source_version_id");
+
+                    b.HasIndex("Id", "CurrentPublishedVersionId")
+                        .HasDatabaseName("ix_playbooks_id_current_published_version_id");
+
+                    b.HasIndex("OrganizationId", "Id")
+                        .HasDatabaseName("ix_playbooks_organization_id_id");
+
+                    b.ToTable("playbooks", "app", t =>
+                        {
+                            t.HasCheckConstraint("ck_playbook_clone_origin", "(source_version_id IS NULL AND source_revision IS NULL AND clone_reason IS NULL) OR (source_version_id IS NOT NULL AND source_revision IS NOT NULL AND source_revision > 0 AND clone_reason IS NOT NULL AND btrim(clone_reason) <> '')");
+
+                            t.HasCheckConstraint("ck_playbook_revision", "revision > 0");
+
+                            t.HasCheckConstraint("ck_playbook_title", "btrim(title) <> ''");
+                        });
+                });
+
+            modelBuilder.Entity("OpenIRP.Domain.Entities.PlaybookCapabilityRequirement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CapabilityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("capability_id");
+
+                    b.Property<string>("Level")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("level");
+
+                    b.Property<Guid?>("StepId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("step_id");
+
+                    b.Property<Guid>("VersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("version_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_playbook_capability_requirements");
+
+                    b.HasIndex("CapabilityId")
+                        .HasDatabaseName("ix_playbook_capability_requirements_capability_id");
+
+                    b.HasIndex("VersionId", "CapabilityId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_playbook_requirement_version")
+                        .HasFilter("step_id IS NULL");
+
+                    b.HasIndex("VersionId", "StepId", "CapabilityId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_playbook_requirement_step")
+                        .HasFilter("step_id IS NOT NULL");
+
+                    b.ToTable("playbook_capability_requirements", "app", t =>
+                        {
+                            t.HasCheckConstraint("ck_playbook_requirement_level", "level IN ('REQUIRED','RECOMMENDED')");
+                        });
+                });
+
+            modelBuilder.Entity("OpenIRP.Domain.Entities.PlaybookExecution", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<string>("FinishReason")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("finish_reason");
+
+                    b.Property<DateTimeOffset?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finished_at");
+
+                    b.Property<Guid>("IncidentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("incident_id");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<Guid>("PlaybookId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("playbook_id");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("VersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("version_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_playbook_executions");
+
+                    b.HasAlternateKey("OrganizationId", "IncidentId", "VersionId", "Id")
+                        .HasName("ak_playbook_executions_organization_id_incident_id_version_id_");
+
+                    b.HasIndex("CreatedByUserId")
+                        .HasDatabaseName("ix_playbook_executions_created_by_user_id");
+
+                    b.HasIndex("OrganizationId", "IncidentId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_incident_active_execution")
+                        .HasFilter("status='IN_PROGRESS'");
+
+                    b.HasIndex("PlaybookId", "VersionId")
+                        .HasDatabaseName("ix_playbook_executions_playbook_id_version_id");
+
+                    b.ToTable("playbook_executions", "app", t =>
+                        {
+                            t.HasCheckConstraint("ck_execution_finish", "(status='IN_PROGRESS' AND finished_at IS NULL AND finish_reason IS NULL) OR (status<>'IN_PROGRESS' AND finished_at IS NOT NULL AND finished_at >= created_at AND finish_reason IS NOT NULL AND btrim(finish_reason)<>'')");
+
+                            t.HasCheckConstraint("ck_execution_revision", "revision > 0");
+
+                            t.HasCheckConstraint("ck_execution_status", "status IN ('IN_PROGRESS','COMPLETED','CANCELLED')");
+                        });
+                });
+
+            modelBuilder.Entity("OpenIRP.Domain.Entities.PlaybookReview", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("action");
+
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_user_id");
+
+                    b.Property<string>("ContentHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("content_hash");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<Guid>("PlaybookId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("playbook_id");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("reason");
+
+                    b.Property<Guid?>("RequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("request_id");
+
+                    b.Property<long>("Revision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.Property<bool>("SelfApproval")
+                        .HasColumnType("boolean")
+                        .HasColumnName("self_approval");
+
+                    b.Property<string>("SelfApprovalJustification")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("self_approval_justification");
+
+                    b.Property<Guid>("VersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("version_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_playbook_reviews");
+
+                    b.HasIndex("ActorUserId")
+                        .HasDatabaseName("ix_playbook_reviews_actor_user_id");
+
+                    b.HasIndex("RequestId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_playbook_review_decision")
+                        .HasFilter("action IN ('PUBLISHED','REJECTED')");
+
+                    b.HasIndex("PlaybookId", "Revision")
+                        .IsUnique()
+                        .HasDatabaseName("ix_playbook_reviews_playbook_id_revision");
+
+                    b.HasIndex("PlaybookId", "VersionId")
+                        .HasDatabaseName("ix_playbook_reviews_playbook_id_version_id");
+
+                    b.HasIndex("RequestId", "Action")
+                        .IsUnique()
+                        .HasDatabaseName("ix_playbook_reviews_request_id_action")
+                        .HasFilter("request_id IS NOT NULL");
+
+                    b.ToTable("playbook_reviews", "app", t =>
+                        {
+                            t.HasCheckConstraint("ck_playbook_review_action", "action IN ('SUBMITTED','PUBLISHED','REJECTED','WITHDRAWN')");
+
+                            t.HasCheckConstraint("ck_playbook_review_fields", "revision > 0 AND btrim(reason) <> '' AND content_hash ~ '^[A-F0-9]{64}$' AND ((action = 'WITHDRAWN' AND request_id IS NULL) OR (action <> 'WITHDRAWN' AND request_id IS NOT NULL))");
+
+                            t.HasCheckConstraint("ck_playbook_review_self", "(self_approval AND action = 'PUBLISHED' AND self_approval_justification IS NOT NULL AND btrim(self_approval_justification) <> '') OR (NOT self_approval AND self_approval_justification IS NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("OpenIRP.Domain.Entities.PlaybookStep", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("code");
+
+                    b.Property<string>("Instructions")
+                        .IsRequired()
+                        .HasMaxLength(8000)
+                        .HasColumnType("character varying(8000)")
+                        .HasColumnName("instructions");
+
+                    b.Property<bool>("IsRequired")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_required");
+
+                    b.Property<string>("Phase")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("phase");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<bool>("RequiresApproval")
+                        .HasColumnType("boolean")
+                        .HasColumnName("requires_approval");
+
+                    b.Property<bool>("RequiresEvidence")
+                        .HasColumnType("boolean")
+                        .HasColumnName("requires_evidence");
+
+                    b.Property<Guid>("VersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("version_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_playbook_steps");
+
+                    b.HasAlternateKey("VersionId", "Id")
+                        .HasName("ak_playbook_steps_version_id_id");
+
+                    b.HasIndex("VersionId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_playbook_steps_version_id_code");
+
+                    b.HasIndex("VersionId", "Position")
+                        .IsUnique()
+                        .HasDatabaseName("ix_playbook_steps_version_id_position");
+
+                    b.ToTable("playbook_steps", "app", t =>
+                        {
+                            t.HasCheckConstraint("ck_playbook_step_code", "code ~ '^[A-Z][A-Z0-9_]{0,59}$'");
+
+                            t.HasCheckConstraint("ck_playbook_step_content", "position BETWEEN 1 AND 10000 AND btrim(phase) <> '' AND btrim(instructions) <> ''");
+                        });
+                });
+
+            modelBuilder.Entity("OpenIRP.Domain.Entities.PlaybookStepDependency", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("PredecessorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("predecessor_id");
+
+                    b.Property<Guid>("SuccessorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("successor_id");
+
+                    b.Property<Guid>("VersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("version_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_playbook_step_dependencies");
+
+                    b.HasIndex("VersionId", "SuccessorId")
+                        .HasDatabaseName("ix_playbook_step_dependencies_version_id_successor_id");
+
+                    b.HasIndex("VersionId", "PredecessorId", "SuccessorId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_playbook_step_dependencies_version_id_predecessor_id_succes");
+
+                    b.ToTable("playbook_step_dependencies", "app", t =>
+                        {
+                            t.HasCheckConstraint("ck_playbook_dependency_self", "predecessor_id <> successor_id");
+                        });
+                });
+
+            modelBuilder.Entity("OpenIRP.Domain.Entities.PlaybookVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("category_id");
+
+                    b.Property<string>("Instructions")
+                        .IsRequired()
+                        .HasMaxLength(12000)
+                        .HasColumnType("character varying(12000)")
+                        .HasColumnName("instructions");
+
+                    b.Property<string>("Objective")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("objective");
+
+                    b.Property<Guid>("PlaybookId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("playbook_id");
+
+                    b.Property<DateTimeOffset?>("PublishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("published_at");
+
+                    b.Property<Guid?>("ReviewRequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("review_request_id");
+
+                    b.Property<Guid?>("SourceVersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_version_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid?>("SubmittedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("submitted_by_user_id");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("title");
+
+                    b.Property<int>("VersionNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("version_number");
+
+                    b.HasKey("Id")
+                        .HasName("pk_playbook_versions");
+
+                    b.HasAlternateKey("PlaybookId", "Id")
+                        .HasName("ak_playbook_versions_playbook_id_id");
+
+                    b.HasIndex("CategoryId")
+                        .HasDatabaseName("ix_playbook_versions_category_id");
+
+                    b.HasIndex("PlaybookId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_playbook_active_draft")
+                        .HasFilter("status IN ('DRAFT','IN_REVIEW')");
+
+                    b.HasIndex("SubmittedByUserId")
+                        .HasDatabaseName("ix_playbook_versions_submitted_by_user_id");
+
+                    b.HasIndex("PlaybookId", "SourceVersionId")
+                        .HasDatabaseName("ix_playbook_versions_playbook_id_source_version_id");
+
+                    b.HasIndex("PlaybookId", "VersionNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_playbook_versions_playbook_id_version_number");
+
+                    b.ToTable("playbook_versions", "app", t =>
+                        {
+                            t.HasCheckConstraint("ck_playbook_version_content", "btrim(objective) <> '' AND btrim(instructions) <> ''");
+
+                            t.HasCheckConstraint("ck_playbook_version_metadata", "(status = 'DRAFT' AND review_request_id IS NULL AND submitted_by_user_id IS NULL AND published_at IS NULL) OR (status = 'IN_REVIEW' AND review_request_id IS NOT NULL AND submitted_by_user_id IS NOT NULL AND published_at IS NULL) OR (status IN ('PUBLISHED','ARCHIVED') AND review_request_id IS NOT NULL AND submitted_by_user_id IS NOT NULL AND published_at IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_playbook_version_source", "source_version_id IS NULL OR source_version_id <> id");
+
+                            t.HasCheckConstraint("ck_playbook_version_state", "version_number > 0 AND status IN ('DRAFT','IN_REVIEW','PUBLISHED','ARCHIVED')");
+
+                            t.HasCheckConstraint("ck_playbook_version_title", "btrim(title) <> ''");
+                        });
+                });
+
+            modelBuilder.Entity("OpenIRP.Domain.Entities.StepApproval", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("action");
+
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_user_id");
+
+                    b.Property<Guid>("AssignedMembershipId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("assigned_membership_id");
+
+                    b.Property<Guid>("CorrelationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("correlation_id");
+
+                    b.Property<Guid>("ExecutionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("execution_id");
+
+                    b.Property<long>("ExecutionRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("execution_revision");
+
+                    b.Property<Guid>("IncidentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("incident_id");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("reason");
+
+                    b.Property<Guid?>("RequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("request_id");
+
+                    b.Property<bool>("SelfApproval")
+                        .HasColumnType("boolean")
+                        .HasColumnName("self_approval");
+
+                    b.Property<string>("SelfApprovalJustification")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("self_approval_justification");
+
+                    b.Property<Guid>("TaskId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("task_id");
+
+                    b.Property<Guid>("VersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("version_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_step_approvals");
+
+                    b.HasAlternateKey("OrganizationId", "IncidentId", "VersionId", "ExecutionId", "TaskId", "AssignedMembershipId", "Id")
+                        .HasName("ak_step_approval_scope");
+
+                    b.HasIndex("ActorUserId")
+                        .HasDatabaseName("ix_step_approvals_actor_user_id");
+
+                    b.HasIndex("RequestId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_step_approvals_request_id")
+                        .HasFilter("request_id IS NOT NULL");
+
+                    b.HasIndex("OrganizationId", "AssignedMembershipId")
+                        .HasDatabaseName("ix_step_approvals_organization_id_assigned_membership_id");
+
+                    b.HasIndex("TaskId", "ExecutionRevision")
+                        .IsUnique()
+                        .HasDatabaseName("ix_step_approvals_task_id_execution_revision");
+
+                    b.HasIndex("OrganizationId", "IncidentId", "VersionId", "ExecutionId", "TaskId", "AssignedMembershipId", "RequestId")
+                        .HasDatabaseName("ix_step_approvals_organization_id_incident_id_version_id_execu");
+
+                    b.ToTable("step_approvals", "app", t =>
+                        {
+                            t.HasCheckConstraint("ck_step_approval_action", "(action='REQUESTED' AND request_id IS NULL) OR (action IN ('APPROVED','REJECTED') AND request_id IS NOT NULL AND request_id<>id)");
+
+                            t.HasCheckConstraint("ck_step_approval_self", "(NOT self_approval AND self_approval_justification IS NULL) OR (self_approval AND action='APPROVED' AND self_approval_justification IS NOT NULL AND btrim(self_approval_justification)<>'')");
+
+                            t.HasCheckConstraint("ck_step_approval_values", "execution_revision>1 AND btrim(reason)<>''");
+                        });
+                });
+
             modelBuilder.Entity("OpenIRP.Infrastructure.Identity.ApplicationUser", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1271,6 +2555,118 @@ namespace OpenIRP.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_assets_organizations_organization_id");
                 });
 
+            modelBuilder.Entity("OpenIRP.Domain.Entities.EvidenceEvent", b =>
+                {
+                    b.HasOne("OpenIRP.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("ActorUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_evidence_events_asp_net_users_actor_user_id");
+
+                    b.HasOne("OpenIRP.Domain.Entities.IncidentEvidence", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "IncidentId", "EvidenceId")
+                        .HasPrincipalKey("OrganizationId", "IncidentId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_evidence_events_incident_evidence_organization_id_incident_");
+                });
+
+            modelBuilder.Entity("OpenIRP.Domain.Entities.EvidenceFile", b =>
+                {
+                    b.HasOne("OpenIRP.Domain.Entities.IncidentEvidence", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "IncidentId", "EvidenceId")
+                        .HasPrincipalKey("OrganizationId", "IncidentId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_evidence_files_incident_evidence_organization_id_incident_i");
+                });
+
+            modelBuilder.Entity("OpenIRP.Domain.Entities.EvidenceFileEvent", b =>
+                {
+                    b.HasOne("OpenIRP.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("ActorUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_evidence_file_events_asp_net_users_actor_user_id");
+
+                    b.HasOne("OpenIRP.Domain.Entities.EvidenceFile", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "IncidentId", "EvidenceId")
+                        .HasPrincipalKey("OrganizationId", "IncidentId", "EvidenceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_evidence_file_events_evidence_files_organization_id_inciden");
+                });
+
+            modelBuilder.Entity("OpenIRP.Domain.Entities.ExecutionTask", b =>
+                {
+                    b.HasOne("OpenIRP.Domain.Entities.OrganizationMembership", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "AssignedMembershipId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_execution_tasks_organization_memberships_organization_id_as");
+
+                    b.HasOne("OpenIRP.Domain.Entities.PlaybookStep", null)
+                        .WithMany()
+                        .HasForeignKey("VersionId", "StepId")
+                        .HasPrincipalKey("VersionId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_execution_tasks_playbook_steps_version_id_step_id");
+
+                    b.HasOne("OpenIRP.Domain.Entities.IncidentEvidence", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "IncidentId", "CompletionEvidenceId")
+                        .HasPrincipalKey("OrganizationId", "IncidentId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_execution_tasks_incident_evidence_organization_id_incident_");
+
+                    b.HasOne("OpenIRP.Domain.Entities.PlaybookExecution", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "IncidentId", "VersionId", "ExecutionId")
+                        .HasPrincipalKey("OrganizationId", "IncidentId", "VersionId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_execution_tasks_playbook_executions_organization_id_inciden");
+                });
+
+            modelBuilder.Entity("OpenIRP.Domain.Entities.ExecutionTaskEvent", b =>
+                {
+                    b.HasOne("OpenIRP.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("ActorUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_execution_task_events_asp_net_users_actor_user_id");
+
+                    b.HasOne("OpenIRP.Domain.Entities.OrganizationMembership", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "AssignedMembershipId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_execution_task_events_organization_memberships_organization");
+
+                    b.HasOne("OpenIRP.Domain.Entities.PlaybookExecution", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "IncidentId", "VersionId", "ExecutionId")
+                        .HasPrincipalKey("OrganizationId", "IncidentId", "VersionId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_execution_task_events_playbook_executions_organization_id_i");
+
+                    b.HasOne("OpenIRP.Domain.Entities.ExecutionTask", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "IncidentId", "VersionId", "ExecutionId", "TaskId")
+                        .HasPrincipalKey("OrganizationId", "IncidentId", "VersionId", "ExecutionId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_execution_task_events_execution_tasks_organization_id_incid");
+                });
+
             modelBuilder.Entity("OpenIRP.Domain.Entities.Incident", b =>
                 {
                     b.HasOne("OpenIRP.Domain.Entities.IncidentCategory", null)
@@ -1279,6 +2675,18 @@ namespace OpenIRP.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_incidents_incident_categories_category_id");
+
+                    b.HasOne("OpenIRP.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("ClosureDecidedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_incidents_asp_net_users_closure_decided_by_user_id");
+
+                    b.HasOne("OpenIRP.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("ClosureRequestedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_incidents_asp_net_users_closure_requested_by_user_id");
 
                     b.HasOne("OpenIRP.Domain.Entities.Organization", null)
                         .WithMany()
@@ -1347,6 +2755,18 @@ namespace OpenIRP.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_incident_events_incident_categories_category_id");
 
+                    b.HasOne("OpenIRP.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("ClosureDecidedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_incident_events_asp_net_users_closure_decided_by_user_id");
+
+                    b.HasOne("OpenIRP.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("ClosureRequestedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_incident_events_asp_net_users_closure_requested_by_user_id");
+
                     b.HasOne("OpenIRP.Domain.Entities.OrganizationMembership", null)
                         .WithMany()
                         .HasForeignKey("OrganizationId", "AssignedMembershipId")
@@ -1361,6 +2781,37 @@ namespace OpenIRP.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_incident_events_incidents_organization_id_incident_id");
+                });
+
+            modelBuilder.Entity("OpenIRP.Domain.Entities.IncidentEvidence", b =>
+                {
+                    b.HasOne("OpenIRP.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_incident_evidence_asp_net_users_created_by_user_id");
+
+                    b.HasOne("OpenIRP.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("WithdrawnByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_incident_evidence_asp_net_users_withdrawn_by_user_id");
+
+                    b.HasOne("OpenIRP.Domain.Entities.Incident", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "IncidentId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_incident_evidence_incidents_organization_id_incident_id");
+
+                    b.HasOne("OpenIRP.Domain.Entities.ExecutionTask", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "IncidentId", "VersionId", "ExecutionId", "TaskId")
+                        .HasPrincipalKey("OrganizationId", "IncidentId", "VersionId", "ExecutionId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_incident_evidence_execution_tasks_organization_id_incident_");
                 });
 
             modelBuilder.Entity("OpenIRP.Domain.Entities.Organization", b =>
@@ -1427,6 +2878,209 @@ namespace OpenIRP.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_platform_administrators_asp_net_users_user_id");
+                });
+
+            modelBuilder.Entity("OpenIRP.Domain.Entities.Playbook", b =>
+                {
+                    b.HasOne("OpenIRP.Domain.Entities.IncidentCategory", null)
+                        .WithMany()
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_playbooks_incident_categories_category_id");
+
+                    b.HasOne("OpenIRP.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_playbooks_asp_net_users_created_by_user_id");
+
+                    b.HasOne("OpenIRP.Domain.Entities.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_playbooks_organizations_organization_id");
+
+                    b.HasOne("OpenIRP.Domain.Entities.PlaybookVersion", null)
+                        .WithMany()
+                        .HasForeignKey("SourceVersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_playbook_clone_source_version");
+
+                    b.HasOne("OpenIRP.Domain.Entities.PlaybookVersion", null)
+                        .WithMany()
+                        .HasForeignKey("Id", "CurrentPublishedVersionId")
+                        .HasPrincipalKey("PlaybookId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_playbook_current_version");
+                });
+
+            modelBuilder.Entity("OpenIRP.Domain.Entities.PlaybookCapabilityRequirement", b =>
+                {
+                    b.HasOne("OpenIRP.Domain.Entities.CapabilityCatalogEntry", null)
+                        .WithMany()
+                        .HasForeignKey("CapabilityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_playbook_capability_requirements_capability_catalog_capabil");
+
+                    b.HasOne("OpenIRP.Domain.Entities.PlaybookVersion", null)
+                        .WithMany()
+                        .HasForeignKey("VersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_playbook_capability_requirements_playbook_versions_version_");
+
+                    b.HasOne("OpenIRP.Domain.Entities.PlaybookStep", null)
+                        .WithMany()
+                        .HasForeignKey("VersionId", "StepId")
+                        .HasPrincipalKey("VersionId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_playbook_capability_requirements_playbook_steps_version_id_");
+                });
+
+            modelBuilder.Entity("OpenIRP.Domain.Entities.PlaybookExecution", b =>
+                {
+                    b.HasOne("OpenIRP.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_playbook_executions_asp_net_users_created_by_user_id");
+
+                    b.HasOne("OpenIRP.Domain.Entities.Incident", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "IncidentId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_playbook_executions_incidents_organization_id_incident_id");
+
+                    b.HasOne("OpenIRP.Domain.Entities.PlaybookVersion", null)
+                        .WithMany()
+                        .HasForeignKey("PlaybookId", "VersionId")
+                        .HasPrincipalKey("PlaybookId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_playbook_executions_playbook_versions_playbook_id_version_id");
+                });
+
+            modelBuilder.Entity("OpenIRP.Domain.Entities.PlaybookReview", b =>
+                {
+                    b.HasOne("OpenIRP.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("ActorUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_playbook_reviews_asp_net_users_actor_user_id");
+
+                    b.HasOne("OpenIRP.Domain.Entities.PlaybookVersion", null)
+                        .WithMany()
+                        .HasForeignKey("PlaybookId", "VersionId")
+                        .HasPrincipalKey("PlaybookId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_playbook_reviews_playbook_versions_playbook_id_version_id");
+                });
+
+            modelBuilder.Entity("OpenIRP.Domain.Entities.PlaybookStep", b =>
+                {
+                    b.HasOne("OpenIRP.Domain.Entities.PlaybookVersion", null)
+                        .WithMany()
+                        .HasForeignKey("VersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_playbook_steps_playbook_versions_version_id");
+                });
+
+            modelBuilder.Entity("OpenIRP.Domain.Entities.PlaybookStepDependency", b =>
+                {
+                    b.HasOne("OpenIRP.Domain.Entities.PlaybookVersion", null)
+                        .WithMany()
+                        .HasForeignKey("VersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_playbook_step_dependencies_playbook_versions_version_id");
+
+                    b.HasOne("OpenIRP.Domain.Entities.PlaybookStep", null)
+                        .WithMany()
+                        .HasForeignKey("VersionId", "PredecessorId")
+                        .HasPrincipalKey("VersionId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_playbook_step_dependencies_playbook_steps_version_id_predec");
+
+                    b.HasOne("OpenIRP.Domain.Entities.PlaybookStep", null)
+                        .WithMany()
+                        .HasForeignKey("VersionId", "SuccessorId")
+                        .HasPrincipalKey("VersionId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_playbook_step_dependencies_playbook_steps_version_id_succes");
+                });
+
+            modelBuilder.Entity("OpenIRP.Domain.Entities.PlaybookVersion", b =>
+                {
+                    b.HasOne("OpenIRP.Domain.Entities.IncidentCategory", null)
+                        .WithMany()
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_playbook_versions_incident_categories_category_id");
+
+                    b.HasOne("OpenIRP.Domain.Entities.Playbook", null)
+                        .WithMany()
+                        .HasForeignKey("PlaybookId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_playbook_versions_playbooks_playbook_id");
+
+                    b.HasOne("OpenIRP.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("SubmittedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_playbook_versions_asp_net_users_submitted_by_user_id");
+
+                    b.HasOne("OpenIRP.Domain.Entities.PlaybookVersion", null)
+                        .WithMany()
+                        .HasForeignKey("PlaybookId", "SourceVersionId")
+                        .HasPrincipalKey("PlaybookId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_playbook_versions_playbook_versions_playbook_id_source_vers");
+                });
+
+            modelBuilder.Entity("OpenIRP.Domain.Entities.StepApproval", b =>
+                {
+                    b.HasOne("OpenIRP.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("ActorUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_step_approvals_asp_net_users_actor_user_id");
+
+                    b.HasOne("OpenIRP.Domain.Entities.OrganizationMembership", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "AssignedMembershipId")
+                        .HasPrincipalKey("OrganizationId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_step_approvals_organization_memberships_organization_id_ass");
+
+                    b.HasOne("OpenIRP.Domain.Entities.ExecutionTask", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "IncidentId", "VersionId", "ExecutionId", "TaskId")
+                        .HasPrincipalKey("OrganizationId", "IncidentId", "VersionId", "ExecutionId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_step_approvals_execution_tasks_organization_id_incident_id_");
+
+                    b.HasOne("OpenIRP.Domain.Entities.StepApproval", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId", "IncidentId", "VersionId", "ExecutionId", "TaskId", "AssignedMembershipId", "RequestId")
+                        .HasPrincipalKey("OrganizationId", "IncidentId", "VersionId", "ExecutionId", "TaskId", "AssignedMembershipId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_step_approvals_step_approvals_organization_id_incident_id_v");
                 });
 #pragma warning restore 612, 618
         }

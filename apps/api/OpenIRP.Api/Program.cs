@@ -14,6 +14,7 @@ using OpenIRP.Infrastructure.Identity;
 using OpenIRP.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddScoped<OpenIRP.Application.Playbooks.IPlaybookDraftService, OpenIRP.Infrastructure.Playbooks.PlaybookDraftService>();
 builder.Services.AddControllersWithViews(options => options.Filters.Add(new AutoValidateAntiforgeryTokenAttribute()))
     .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddOpenApi();
@@ -54,6 +55,10 @@ builder.Services.AddScoped<AuditRecorder>();
 builder.Services.AddScoped<IAuditReader, AuditReader>();
 builder.Services.AddScoped<IInventoryService, InventoryService>();
 builder.Services.AddScoped<IIncidentService, IncidentService>();
+builder.Services.AddScoped<OpenIRP.Application.Incidents.IEvidenceService, IncidentService>();
+builder.Services.AddScoped<OpenIRP.Application.Incidents.IFileEvidenceService, IncidentService>();
+builder.Services.AddSingleton<OpenIRP.Application.Incidents.IPrivateEvidenceStore, PrivateEvidenceStore>();
+builder.Services.AddScoped<OpenIRP.Application.Executions.IExecutionService, IncidentService>();
 var app = builder.Build();
 
 // Explicit offline command: no startup seeding, HTTP listener, implicit migration or public bootstrap route.

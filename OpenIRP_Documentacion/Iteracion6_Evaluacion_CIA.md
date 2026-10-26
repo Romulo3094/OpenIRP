@@ -1,5 +1,7 @@
 # Evaluación CIA — desarrollo local
 
+> Esta guía registra el alcance de esa iteración. La [Iteración 9](Iteracion9_Severidad_Incidente.md) amplía después los contratos y activa la clasificación versionada.
+
 Iteración 6, 23 de octubre de 2026, rama `feature/paso26-identidad-organizaciones`. Se conservan los cambios locales pendientes de las subfases anteriores. Esta entrega no crea un nuevo commit, push ni merge.
 
 ## Alcance implementado

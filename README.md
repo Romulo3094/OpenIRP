@@ -150,7 +150,7 @@ La Iteración 3 agrega registro, consulta, corrección y asignación de incident
 
 La migración `InitialIncidentRegister` está aplicada en `openirp_dev` tras respaldar y restaurar una copia aislada, conservando datos previos. La validación de esa subfase pasó **94/94 pruebas en PostgreSQL 17 y 94/94 en PostgreSQL 18**, sin omitidas. Consulta [rutas, contratos, archivos y evidencias](OpenIRP_Documentacion/Iteracion3_Registro_Incidentes.md).
 
-Esta subfase conserva el estado REGISTERED: evaluación CIA, severidad, respuesta y cierre siguen pendientes de la regla determinista y sus controles. No se asigna severidad baja por omisión. El avance previo se publicó en `d7ced5f`; los cambios de incidentes permanecen locales, posteriores a ese commit.
+El registro inicia en REGISTERED; las iteraciones posteriores incorporan evaluaciones, severidad y ciclo de vida con controles explícitos. No se asigna severidad baja por omisión. Las iteraciones 3–6 se publicaron en `0c70669`.
 
 ### Activos afectados por incidente
 
@@ -162,15 +162,103 @@ La nueva migración está aplicada en la base local tras respaldo y restauració
 
 La Iteración 5 permite heredar el perfil de la organización o evaluar disponibilidad específica del incidente, con motivo, limitaciones e historial. Unknown explícito es distinto de heredar. Se comprueban las revisiones del incidente, perfil y catálogo para rechazar decisiones basadas en contexto obsoleto. ANALYST puede documentar el incidente; el perfil general sigue reservado a ORG_ADMIN.
 
-Migración local aplicada tras respaldo y restauración de prueba, conservando los datos previos. Validación de esa subfase: **156/156 pruebas en PostgreSQL 17 y 156/156 en PostgreSQL 18**, sin fallidas ni omitidas. Consulta [endpoints, archivos y evidencias](OpenIRP_Documentacion/Iteracion5_Capacidades_Incidente.md). Los cambios continúan locales sin nuevo commit/push; CIA, regla de severidad y ciclo de vida completo siguen pendientes.
+Migración local aplicada tras respaldo y restauración de prueba, conservando los datos previos. Validación de esa subfase: **156/156 pruebas en PostgreSQL 17 y 156/156 en PostgreSQL 18**, sin fallidas ni omitidas. Consulta [endpoints, archivos y evidencias](OpenIRP_Documentacion/Iteracion5_Capacidades_Incidente.md). Esta iteración se publicó junto con CIA en `0c70669`; las iteraciones 9 y 10 incorporan después severidad y ciclo de vida con cierre manual controlado.
 
 ### Evaluación de impacto CIA
 
-La Iteración 6 permite evaluar confidencialidad, integridad y disponibilidad con None/Low/Medium/High o null explícito cuando falta investigar. Exige motivo y revisión, protege datos por organización y conserva CIA en el historial de todas las modificaciones posteriores. No deriva severidad ni autoriza cierre automáticamente.
+La Iteración 6 permite evaluar confidencialidad, integridad y disponibilidad con None/Low/Medium/High o null explícito cuando falta investigar. Exige motivo y revisión, protege datos por organización y conserva CIA en el historial de todas las modificaciones posteriores. La Iteración 9 integra estos valores en la regla versionada; CIA no autoriza cierre automáticamente.
 
-Migración local aplicada tras respaldo/restauración verificados, conservando datos previos. Suite actual: **181/181 pruebas en PostgreSQL 17 y 181/181 en PostgreSQL 18**, sin fallidas ni omitidas. Consulta [archivos, endpoints y evidencias CIA](OpenIRP_Documentacion/Iteracion6_Evaluacion_CIA.md).
+Migración local aplicada tras respaldo/restauración verificados, conservando datos previos. Validación de esa subfase: **181/181 pruebas en PostgreSQL 17 y 181/181 en PostgreSQL 18**, sin fallidas ni omitidas. Consulta [archivos, endpoints y evidencias CIA](OpenIRP_Documentacion/Iteracion6_Evaluacion_CIA.md).
 
-La [propuesta de severidad v1](OpenIRP_Documentacion/Propuesta_Regla_Severidad_v1.md) incluye una matriz comprobada en un prototipo matemático aislado, todavía sin activar en la API. La política de desconocidos está confirmada: Pending y severity=null hasta completar todas las entradas requeridas, sin severidad provisional. Los umbrales siguen sujetos a revisión. Los cambios de desarrollo continúan locales, sin nuevo commit/push.
+La [propuesta de severidad v1](OpenIRP_Documentacion/Propuesta_Regla_Severidad_v1.md) incluye una matriz comprobada en un prototipo matemático aislado, adoptada por el usuario e implementada en la Iteración 9. La política de desconocidos está confirmada: Pending y severity=null hasta completar todas las entradas requeridas, sin severidad provisional. Los umbrales se adoptaron para el MVP y siguen sujetos a evaluación con casos reales. Las iteraciones 3–6 y la decisión inicial sobre desconocidos se publicaron en el commit 0c70669; la adopción de la matriz corresponde a la Iteración 9 local. La siguiente subfase se desarrolla localmente.
+
+La [Iteración 7: alcance y afectación operacional](OpenIRP_Documentacion/Iteracion7_Contexto_Incidente.md) incorpora PUT `/api/organizations/{org}/incidents/{incident}/context`, con entradas nullable explícitas, motivo, revisión, permisos por organización y snapshots en todos los eventos. La clasificación de severidad se incorpora posteriormente en la Iteración 9.
+Validación de la Iteración 7: **216/216 pruebas en PostgreSQL 17 y 216/216 en PostgreSQL 18**, sin fallidas ni omitidas. Migración aplicada a la base local tras respaldo/restauración comprobados; esta nueva subfase permanece local, posterior al commit publicado `0c70669`.
+### Criticidad evaluada del incidente
+
+La [Iteración 8](OpenIRP_Documentacion/Iteracion8_Criticidad_Incidente.md) incorpora PUT `/api/organizations/{org}/incidents/{incident}/criticality`: decisión explícita independiente de los reportes originales, justificación de reducciones, evidencia versionada y snapshots. Cambiar los activos invalida la evaluación; un reset a null no permite eludir la justificación de una reducción posterior. El cálculo de severidad se incorpora posteriormente en la Iteración 9.
+
+La compilación Release pasó sin errores ni advertencias y PostgreSQL 17 pasó **259/259 pruebas**, incluidas 43 nuevas. PostgreSQL 18 también pasó **259/259 pruebas**, sin fallidas ni omitidas. La migración local se aplicó tras respaldo/restauración comprobados y mantuvo los datos previos. Las iteraciones 7 y 8 siguen locales, posteriores a `0c70669`.
+### Severidad actual y máximo histórico
+
+La [Iteración 9](OpenIRP_Documentacion/Iteracion9_Severidad_Incidente.md) incorpora la matriz `openirp-severity-v1`, adoptada por el usuario para el MVP. Las entradas incompletas producen Pending/severity=null y conservan el máximo histórico. Los incidentes anteriores requieren una primera reevaluación explícita mediante PUT `/api/organizations/{org}/incidents/{incident}/severity`; no se recalcula la historia pasada.
+
+Los cambios de entradas recalculan transaccionalmente para incidentes con regla activa. La API guarda entradas/regla/revisión y PostgreSQL impide rebajar el máximo. Las ediciones ordinarias conservan la clasificación; el ciclo de vida y cierre se incorporan en la Iteración 10. Los umbrales siguen sujetos a evaluación con casos reales.
+
+Release sin errores ni advertencias y **314/314 pruebas correctas en PostgreSQL 17**, sin omitidas. PostgreSQL 18 también pasó **314/314 pruebas**, sin fallidas ni omitidas. Son 55 casos nuevos: 20 del evaluador y 35 de integración. Migración local aplicada tras respaldo/restauración verificados, conservando los datos. Las iteraciones 7–9 permanecen locales, sin nuevo commit/push.
+### Ciclo de vida y cierre
+
+La [Iteración 10](OpenIRP_Documentacion/Iteracion10_Ciclo_Vida_Cierre.md) incorpora evaluación, respuesta, resolución, descarte/reapertura y cierre manual. LOW/MEDIUM cierra el responsable asignado activo; HIGH/CRITICAL histórico exige decisión ORG_ADMIN. La aprobación cierra en la misma transacción y la autoaprobación queda identificada con justificación adicional.
+
+Toda modificación invalida una revisión pendiente y los estados terminales requieren reapertura antes de editar. Pending/NotEvaluated impide cerrar. La historia de resoluciones y decisiones se conserva.
+
+**363/363 pruebas correctas en PostgreSQL 17 y 18**, sin fallidas ni omitidas; 49 casos nuevos. Compilación limpia y migración local tras respaldo/restauración verificados. Cambios de las iteraciones 7–10 locales, sin nuevo commit/push. El primer catálogo de borradores se incorpora en la Iteración 11; ejecución guiada, evidencias y endurecimiento operativo siguen pendientes.
+
+
+
+
+
+
+### Catálogo de playbooks y borradores
+
+La [Iteración 11](OpenIRP_Documentacion/Iteracion11_Catalogo_Borradores_Playbooks.md) incorpora catálogos administrativos PUBLIC/PRIVATE con primer borrador, pasos, dependencias sin ciclos y requisitos de capacidades. PLATFORM_ADMIN administra los borradores globales; ORG_ADMIN, los de su organización. Borradores públicos no significa acceso anónimo.
+
+Las ediciones son transaccionales, auditadas y protegidas por revisión. PostgreSQL impide referencias de pasos entre versiones y cambios de identidad/propietario. Esta subfase solo admite versión 1 DRAFT; revisión, publicación inmutable, retirada y clonación siguen a continuación.
+
+**407/407 pruebas correctas en PostgreSQL 17 y 18**, sin fallidas ni omitidas; 44 casos nuevos. Compilación limpia, EF sin diferencias y migración local aplicada después de respaldo/restauración verificados. Se conservaron los datos existentes. Las iteraciones 7–11 permanecen locales, sin nuevo commit/push.
+
+### Publicación y vigencia de versiones
+
+La [Iteración 12](OpenIRP_Documentacion/Iteracion12_Publicacion_Versiones_Playbooks.md) añade revisión, rechazo/publicación, autoaprobación explícita justificada, nuevas versiones desde publicaciones del mismo playbook y retirada. El contenido revisado/publicado queda protegido en PostgreSQL, incluidos pasos y requisitos.
+
+La versión vigente procede de un puntero explícito. Retirarla deja el catálogo sin vigente hasta otra publicación; editar un borrador posterior conserva el contenido anterior para sus lectores. Usuarios activos consultan publicaciones globales y miembros activos las privadas de su organización.
+
+**451/451 pruebas correctas en PostgreSQL 17 y 18**, sin fallidas ni omitidas; 44 casos nuevos de integración y 88 enfocados del módulo. Compilación limpia, EF sin diferencias, migración local tras respaldo/restauración verificados y datos existentes conservados. Las iteraciones 7–12 siguen locales, sin nuevo commit/push. Continúan clonación entre playbooks, ejecución guiada y evidencias.
+
+### Clonación autorizada de playbooks
+
+La [Iteración 13](OpenIRP_Documentacion/Iteracion13_Clonacion_Playbooks.md) permite copiar publicaciones vigentes a playbooks independientes en DRAFT, con nuevos UUID para todo el grafo y procedencia inmutable. Admite fuentes públicas y privadas de la misma organización; impide exportar contenido privado a otro tenant o al ámbito público.
+
+No hereda aprobaciones ni publica automáticamente. Las referencias de catálogo deben seguir activas, y una edición o retirada concurrente de la fuente se resuelve bajo el gate compartido con comprobación de revisión.
+
+**490/490 pruebas correctas en PostgreSQL 17 y 18**, sin fallidas ni omitidas; 39 casos nuevos y 127 enfocados de playbooks. Compilación limpia y EF sin diferencias. Migración local tras respaldo/restauración verificados; datos existentes conservados. Las iteraciones 7–13 siguen locales, sin nuevo commit/push. Siguiente bloque: ejecuciones, tareas y dependencias.
+
+### Ejecuciones y tareas iniciales
+
+La [Iteración 14](OpenIRP_Documentacion/Iteracion14_Ejecuciones_Tareas.md) permite iniciar una publicación vigente sobre un incidente en respuesta, generar tareas, asignarlas y avanzar según dependencias. Completar/cancelar queda auditado y no cierra el incidente automáticamente.
+
+Una ejecución activa bloquea cambiar categoría o abandonar respuesta. Las versiones retiradas bloquean avance; los requisitos de aprobación/evidencia y las omisiones no pueden eludirse mientras sus módulos siguen pendientes.
+
+**531/531 pruebas correctas en PostgreSQL 17 y 18**, sin fallidas ni omitidas; 41 nuevas y 90 enfocadas de ejecución/ciclo de vida. Compilación limpia, EF sin diferencias y migración local tras respaldo/restauración verificados; datos conservados. Las iteraciones 7–14 siguen locales, sin nuevo commit/push. En esta entrega las evidencias, aprobaciones y excepciones seguían pendientes. La aprobación de pasos se incorpora en la Iteración 15.
+
+
+### Aprobación de pasos de ejecución
+
+La [Iteración 15](OpenIRP_Documentacion/Iteracion15_Aprobaciones_Pasos.md) permite al responsable solicitar autorización de pasos y a ORG_ADMIN aprobar/rechazar. La autoaprobación exige excepción explícita justificada. Reasignar invalida solicitudes/aprobaciones previas, incluso con la misma membresía; cada decisión queda en historia append-only.
+
+La autorización no reemplaza dependencias ni evidencias, no permite omitir tareas y no resuelve/cierra incidentes. Se conservan los bloqueos por versión retirada. Hay tres endpoints nuevos con ámbito por organización/incidente/tarea y CSRF.
+
+**565/565 pruebas correctas en PostgreSQL 17 y 18.3**, sin fallidas ni omitidas, incluidas 34 nuevas. Release sin errores/advertencias y EF sin diferencias. HTTPS: health/OpenAPI 200 y 41 operaciones anónimas 401. Instancias temporales detenidas.
+
+**Base habitual actualizada (2026-10-25):** Docker recuperado; StepApprovals aplicada a openirp_dev después de respaldo/restauración completos verificados y cotejo de conteos/historial. Dieciséis migraciones; datos existentes conservados y tabla de aprobaciones vacía. La guía de Iteración 15 contiene la evidencia. Sin nuevo commit/push; frontend preservado.
+
+
+### Evidencias de incidente y tarea
+
+La [Iteración 16](OpenIRP_Documentacion/Iteracion16_Evidencias_Incidente_Tarea.md) incorpora TEXT y REFERENCE, registro/consulta/historial y retirada justificada por ORG_ADMIN. Los vínculos y contenido son inmutables; las retiradas ocultan título/contenido y conservan la trazabilidad.
+
+Completar un paso RequiresEvidence exige seleccionar una evidencia activa de esa tarea exacta. La tarea conserva completionEvidenceId como soporte histórico incluso si la evidencia se retira después. Siguen aplicando STEP_APPROVAL, dependencias y permisos. FILE y RESTRICTED permanecen pendientes.
+
+**604/604 pruebas correctas en PostgreSQL 17 y 18.3**, incluidas 39 nuevas; Release sin errores/advertencias y EF sin diferencias. Migración local aplicada tras respaldo/restauración verificados: 17 migraciones y datos existentes conservados. HTTPS: 46 operaciones presentes, anónimos 401. Sin nuevo commit/push; frontend preservado.
+
+
+### Archivos privados de evidencia
+
+La [Iteración 17](OpenIRP_Documentacion/Iteracion17_Archivos_Privados_Evidencia.md) añade carga multipart PDF/PNG/JPEG/TXT hasta 10 MB, SHA-256, descarga autenticada, historial y recuperación administrativa. Los archivos se conservan en un directorio privado; retirar bloquea nuevas descargas y no purga los bytes.
+
+ci/Start-LocalApi.ps1 configura por defecto .openirp-data/evidence (ignorado por Git/grafos); admite -EvidenceRoot y la variable EvidenceFiles__RootPath. Usando otro arranque, configurar una raíz absoluta privada. La validación de formatos/hash no sustituye antivirus. RESTRICTED y purga siguen pendientes.
+
+**639/639 de regresión completa en PostgreSQL 17 y 18.3; 36/36 finales de archivos por motor después del ajuste de commits inciertos.** Son conjuntos superpuestos, no se suman. Compilación limpia, EF sin diferencias; 18 migraciones locales tras respaldo/restauración verificados, datos conservados y sin archivos ficticios en la base habitual. HTTPS: 51 operaciones comprobadas, anónimos 401. Sin nuevo commit/push.
 
 ## Alcance y limitaciones
 

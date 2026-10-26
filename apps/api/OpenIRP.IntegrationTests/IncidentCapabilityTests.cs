@@ -307,7 +307,7 @@ public sealed partial class IdentityAdministrationTests
     [Fact]
     public async Task CapabilityMigrationPreservesEarlierHistoryAndRejectsLossyDowngrade()
     {
-        var seed=await Seed();var incident=await RegisterIncident(seed.Admin,seed.Org.Id);var capability=await CapabilityId();
+        var seed=await Seed();var incident=await RegisterLegacyIncident(seed.Admin,seed.Org.Id);var capability=await CapabilityId();
         var before=(await Incidents(s=>s.EventsAsync(seed.Admin,seed.Org.Id,incident.Id))).Items.Single();
         await InScope(async (_,db)=>{await db.GetService<IMigrator>().MigrateAsync("20261022194422_IncidentAssetSnapshots");await db.Database.MigrateAsync();return true;});
         var after=(await Incidents(s=>s.EventsAsync(seed.Admin,seed.Org.Id,incident.Id))).Items.Single();

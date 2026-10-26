@@ -1,4 +1,4 @@
-param([switch]$Bootstrap)
+param([switch]$Bootstrap, [string]$EvidenceRoot)
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path $PSScriptRoot -Parent
 $config = docker inspect openirp-postgres | ConvertFrom-Json
@@ -14,6 +14,7 @@ $previousConnection = $env:ConnectionStrings__OpenIRP
 $previousEnabled = $env:OPENIRP_BOOTSTRAP_ENABLED
 $previousEmail = $env:OPENIRP_BOOTSTRAP_EMAIL
 $previousPassword = $env:OPENIRP_BOOTSTRAP_PASSWORD
+$previousEvidenceRoot = $env:EvidenceFiles__RootPath
 $securePassword = $null
 try {
     $connection = [System.Data.Common.DbConnectionStringBuilder]::new()
@@ -23,6 +24,9 @@ try {
     $connection['Username'] = 'openirp'
     $connection['Password'] = $settings.POSTGRES_PASSWORD
     $env:ConnectionStrings__OpenIRP = $connection.ConnectionString
+    if (!$EvidenceRoot) { $EvidenceRoot = $previousEvidenceRoot }
+    if (!$EvidenceRoot) { $EvidenceRoot = Join-Path $repoRoot ".openirp-data/evidence" }
+    $env:EvidenceFiles__RootPath = [IO.Path]::GetFullPath($EvidenceRoot)
     $env:OPENIRP_BOOTSTRAP_ENABLED = $null
     if ($Bootstrap) {
         $env:OPENIRP_BOOTSTRAP_EMAIL = Read-Host 'Correo del administrador verificado fuera de banda'
@@ -35,6 +39,7 @@ try {
     }
     if ($LASTEXITCODE -ne 0) { throw "Local API command failed (exit $LASTEXITCODE)." }
 } finally {
+    $env:EvidenceFiles__RootPath = $previousEvidenceRoot
     $env:ConnectionStrings__OpenIRP = $previousConnection
     $env:OPENIRP_BOOTSTRAP_ENABLED = $previousEnabled
     $env:OPENIRP_BOOTSTRAP_EMAIL = $previousEmail

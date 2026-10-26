@@ -11,19 +11,36 @@ public sealed record IncidentAssignment([property: JsonRequired] Guid? AssignedM
     [property: JsonRequired] long ExpectedRevision);
 public sealed record IncidentItem(Guid Id, Guid OrganizationId, Guid CategoryId, string Title, string? Description,
     string Status, Guid? AssignedMembershipId, long Revision, DateTimeOffset CreatedAt,
-    ImpactLevel? ConfidentialityImpact, ImpactLevel? IntegrityImpact, ImpactLevel? AvailabilityImpact)
+    ImpactLevel? ConfidentialityImpact, ImpactLevel? IntegrityImpact, ImpactLevel? AvailabilityImpact,
+    IncidentScope? Scope, OperationalImpact? OperationalImpact,
+    IncidentCriticality? AssessedCriticality, long? CriticalityAssessedAtRevision,
+    IncidentSeverity? Severity, IncidentSeverity? MaximumSeverityReached, string? SeverityRuleVersion, long? SeverityAssessedAtRevision,
+    string? Resolution, IncidentClosureReview? ClosureReview)
 {
+    public string ClassificationStatus => SeverityRuleVersion is null ? "NotEvaluated" : Severity is null ? "Pending" : "Classified";
+    public bool IsCriticalityAssessmentComplete => AssessedCriticality is not null;
+    public bool IsContextAssessmentComplete => Scope is not null && OperationalImpact is not null;
     public bool IsImpactAssessmentComplete => ConfidentialityImpact is not null && IntegrityImpact is not null && AvailabilityImpact is not null;
 }
 public sealed record IncidentEventItem(Guid Id, Guid IncidentId, long Revision, Guid ActorUserId, Guid CorrelationId,
     string Action, string? Reason, Guid CategoryId, string Title, string? Description, string Status,
     Guid? AssignedMembershipId, DateTimeOffset OccurredAt, JsonElement Details,
-    ImpactLevel? ConfidentialityImpact, ImpactLevel? IntegrityImpact, ImpactLevel? AvailabilityImpact);
+    ImpactLevel? ConfidentialityImpact, ImpactLevel? IntegrityImpact, ImpactLevel? AvailabilityImpact,
+    IncidentScope? Scope, OperationalImpact? OperationalImpact,
+    IncidentCriticality? AssessedCriticality, long? CriticalityAssessedAtRevision,
+    IncidentSeverity? Severity, IncidentSeverity? MaximumSeverityReached, string? SeverityRuleVersion, long? SeverityAssessedAtRevision,
+    string? Resolution, IncidentClosureReview? ClosureReview);
 public sealed record IncidentPage<T>(IReadOnlyList<T> Items, int? NextSkip);
 public sealed record IncidentEventPage(IReadOnlyList<IncidentEventItem> Items, long? NextAfterRevision);
 
 public interface IIncidentService
 {
+    Task<IncidentItem> TransitionAsync(Guid actor, Guid organization, Guid incident, TransitionIncident request, CancellationToken ct = default);
+    Task<IncidentItem> RequestClosureAsync(Guid actor, Guid organization, Guid incident, RequestIncidentClosure request, CancellationToken ct = default);
+    Task<IncidentItem> DecideClosureAsync(Guid actor, Guid organization, Guid incident, Guid closureRequest, DecideIncidentClosure request, CancellationToken ct = default);
+    Task<IncidentItem> AssessSeverityAsync(Guid actor, Guid organization, Guid incident, AssessIncidentSeverity request, CancellationToken ct = default);
+    Task<IncidentItem> AssessCriticalityAsync(Guid actor, Guid organization, Guid incident, AssessIncidentCriticality request, CancellationToken ct = default);
+    Task<IncidentItem> AssessContextAsync(Guid actor, Guid organization, Guid incident, AssessIncidentContext request, CancellationToken ct = default);
     Task<IncidentItem> AssessImpactAsync(Guid actor, Guid organization, Guid incident, AssessIncidentImpact request, CancellationToken ct = default);
     Task<IncidentCapabilityPage> CapabilitiesAsync(Guid actor, Guid organization, Guid incident, int skip = 0, int limit = 50, CancellationToken ct = default);
     Task<IncidentCapabilityChange> AssessCapabilityAsync(Guid actor, Guid organization, Guid incident, Guid capability, AssessIncidentCapability request, CancellationToken ct = default);

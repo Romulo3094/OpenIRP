@@ -199,7 +199,7 @@ public sealed partial class IdentityAdministrationTests
     [Fact]
     public async Task CiaMigrationPreservesUnevaluatedHistoryAndRefusesLossAfterReset()
     {
-        var seed=await Seed();var incident=await RegisterIncident(seed.Admin,seed.Org.Id);
+        var seed=await Seed();var incident=await RegisterLegacyIncident(seed.Admin,seed.Org.Id);
         var before=(await Incidents(s=>s.EventsAsync(seed.Admin,seed.Org.Id,incident.Id))).Items.Single();
         await InScope(async (_,db)=>{await db.GetService<IMigrator>().MigrateAsync("20261022204102_IncidentCapabilityAssessments");await db.Database.MigrateAsync();return true;});
         var after=(await Incidents(s=>s.EventsAsync(seed.Admin,seed.Org.Id,incident.Id))).Items.Single();
@@ -232,7 +232,7 @@ public sealed partial class IdentityAdministrationTests
         var item=JsonSerializer.Deserialize<IncidentItem>(responseBody,InventoryJson)!;
         Assert.Equal(ImpactLevel.None,item.ConfidentialityImpact);Assert.Null(item.IntegrityImpact);Assert.False(item.IsImpactAssessmentComplete);
         Assert.Equal("REGISTERED",item.Status);
-        var raw=JsonSerializer.Deserialize<JsonElement>(responseBody);Assert.False(raw.TryGetProperty("severity",out _));
+        var raw=JsonSerializer.Deserialize<JsonElement>(responseBody);Assert.Equal(JsonValueKind.Null,raw.GetProperty("severity").ValueKind);
         Assert.Equal(HttpStatusCode.Conflict,(await admin.PutAsJsonAsync(route,Cia())).StatusCode);
         var listed=(await admin.GetFromJsonAsync<IncidentPage<IncidentItem>>($"/api/organizations/{seed.Org.Id}/incidents",InventoryJson))!.Items.Single();
         Assert.Equal(ImpactLevel.High,listed.AvailabilityImpact);Assert.Null(listed.IntegrityImpact);
