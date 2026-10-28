@@ -318,15 +318,18 @@ public sealed partial class IdentityAdministrationTests
                 await incidents.TransitionAsync(administrator, organization.Id, registered.Id, new(IncidentState.UnderEvaluation, null, "Evaluate", 14));
                 await incidents.TransitionAsync(administrator, organization.Id, registered.Id, new(IncidentState.InResponse, null, "Respond", 15));
                 await incidents.TransitionAsync(administrator, organization.Id, registered.Id, new(IncidentState.Resolved, "Runtime resolution", "Resolve", 16));
-                var review = await incidents.RequestClosureAsync(administrator, organization.Id, registered.Id, new("Request closure", 17));
+                var closureContextSnapshot = await incidents.ClosureReadinessAsync(administrator, organization.Id, registered.Id);
+                var risk = await incidents.ReviewClosureRiskAsync(administrator, organization.Id, registered.Id,
+                    new(true, "Runtime assessment of residual risks and mitigations", "Runtime risk review", true, "Runtime exceptional self-review", 17, closureContextSnapshot.ClosureContextToken));
+                var review = await incidents.RequestClosureAsync(administrator, organization.Id, registered.Id, new("Request closure", risk.IncidentRevision));
                 var closed = await incidents.DecideClosureAsync(administrator, organization.Id, registered.Id, review.ClosureReview!.Id,
-                    new(true, true, "Runtime exceptional self-approval", "Approve closure", 18));
+                    new(true, true, "Runtime exceptional self-approval", "Approve closure", review.Revision));
                 Assert.Equal("CLOSED", closed.Status);
                 var terminalEdit = await Assert.ThrowsAsync<PostgresException>(() => db.Database.ExecuteSqlRawAsync("UPDATE app.incidents SET title='Forbidden terminal edit'"));
                 Assert.Equal("23514", terminalEdit.SqlState);
-                var reopened = await incidents.TransitionAsync(administrator, organization.Id, registered.Id, new(IncidentState.UnderEvaluation, null, "Reopen", 19));
+                var reopened = await incidents.TransitionAsync(administrator, organization.Id, registered.Id, new(IncidentState.UnderEvaluation, null, "Reopen", closed.Revision));
                 Assert.Equal(ClosureReviewStatus.Invalidated, reopened.ClosureReview!.Status);
-                Assert.Equal(25, await db.AuditEvents.CountAsync());
+                Assert.Equal(26, await db.AuditEvents.CountAsync());
                 foreach (var sql in new[] { "UPDATE app.incident_capability_assessments SET capability_id=capability_id", "DELETE FROM app.incident_capability_assessments", "TRUNCATE app.incident_capability_assessments", "ALTER TABLE app.incident_capability_assessments DISABLE TRIGGER ALL" })
                 {
                     var error = await Assert.ThrowsAsync<PostgresException>(() => db.Database.ExecuteSqlRawAsync(sql));

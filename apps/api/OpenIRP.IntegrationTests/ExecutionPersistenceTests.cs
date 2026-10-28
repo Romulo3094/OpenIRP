@@ -160,6 +160,7 @@ public sealed partial class IdentityAdministrationTests
         incident = await Incidents(s => s.GetAsync(f.Admin, f.Org, incident.Id));
         Assert.Equal("IN_RESPONSE", incident.Status);
         incident = await MoveWorkflow(f.Admin, f.Org, incident, IncidentState.Resolved, "Resolución confirmada");
+        incident = await AcceptRiskForTest(f.Admin, f.Org, incident);
         incident = await MoveWorkflow(f.Admin, f.Org, incident, IncidentState.Closed);
         Assert.Equal("CLOSED", incident.Status);
         Assert.Equal("COMPLETED", (await Executions(s => s.GetAsync(f.Admin, f.Org, incident.Id, current.Id))).Status);

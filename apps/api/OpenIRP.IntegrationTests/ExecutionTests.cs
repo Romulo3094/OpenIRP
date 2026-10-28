@@ -19,11 +19,12 @@ public sealed partial class IdentityAdministrationTests
     private async Task<T> Executions<T>(Func<IExecutionService, Task<T>> action)
     { using var scope = app.Services.CreateScope(); return await action(scope.ServiceProvider.GetRequiredService<IExecutionService>()); }
 
-    private async Task<ExecutionFixture> ExecutionSeed(bool privatePlaybook = false, bool controls = false, bool approvals = false, bool approvalEvidence = false)
+    private async Task<ExecutionFixture> ExecutionSeed(bool privatePlaybook = false, bool controls = false, bool approvals = false, bool approvalEvidence = false, Func<PlaybookDraftContent, PlaybookDraftContent>? customize = null)
     {
         var seed = await Seed(); var content = await DraftContent();
         if (!controls) content = content with { Steps = content.Steps.Select(s => s with { RequiresApproval = false, RequiresEvidence = false }).ToList() };
         if (approvals) content = content with { Steps = content.Steps.Select((s, i) => s with { RequiresApproval = i == 0, RequiresEvidence = i == 0 && approvalEvidence }).ToList() };
+        if (customize is not null) content = customize(content);
         Guid? sourceOrg = privatePlaybook ? seed.Org.Id : null; var author = privatePlaybook ? seed.Admin : seed.Platform;
         var source = await Playbooks(s => s.CreateAsync(author, sourceOrg, new(content)));
         source = await DecidePlaybook(author, sourceOrg, await SubmitPlaybook(author, sourceOrg, source));

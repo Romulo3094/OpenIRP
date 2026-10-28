@@ -188,7 +188,7 @@ Los cambios de entradas recalculan transaccionalmente para incidentes con regla 
 Release sin errores ni advertencias y **314/314 pruebas correctas en PostgreSQL 17**, sin omitidas. PostgreSQL 18 también pasó **314/314 pruebas**, sin fallidas ni omitidas. Son 55 casos nuevos: 20 del evaluador y 35 de integración. Migración local aplicada tras respaldo/restauración verificados, conservando los datos. Las iteraciones 7–9 permanecen locales, sin nuevo commit/push.
 ### Ciclo de vida y cierre
 
-La [Iteración 10](OpenIRP_Documentacion/Iteracion10_Ciclo_Vida_Cierre.md) incorpora evaluación, respuesta, resolución, descarte/reapertura y cierre manual. LOW/MEDIUM cierra el responsable asignado activo; HIGH/CRITICAL histórico exige decisión ORG_ADMIN. La aprobación cierra en la misma transacción y la autoaprobación queda identificada con justificación adicional.
+La [Iteración 10](OpenIRP_Documentacion/Iteracion10_Ciclo_Vida_Cierre.md) incorpora evaluación, respuesta, resolución, descarte/reapertura y cierre manual. LOW/MEDIUM cierra el responsable asignado activo; HIGH/CRITICAL histórico exige decisión ORG_ADMIN. La aprobación cierra en la misma transacción y la autoaprobación queda identificada con justificación adicional. Todos los niveles requieren además aceptación vigente de riesgo por ORG_ADMIN conforme a la Iteración 26.
 
 Toda modificación invalida una revisión pendiente y los estados terminales requieren reapertura antes de editar. Pending/NotEvaluated impide cerrar. La historia de resoluciones y decisiones se conserva.
 
@@ -227,7 +227,7 @@ No hereda aprobaciones ni publica automáticamente. Las referencias de catálogo
 
 La [Iteración 14](OpenIRP_Documentacion/Iteracion14_Ejecuciones_Tareas.md) permite iniciar una publicación vigente sobre un incidente en respuesta, generar tareas, asignarlas y avanzar según dependencias. Completar/cancelar queda auditado y no cierra el incidente automáticamente.
 
-Una ejecución activa bloquea cambiar categoría o abandonar respuesta. Las versiones retiradas bloquean avance; los requisitos de aprobación/evidencia y las omisiones no pueden eludirse mientras sus módulos siguen pendientes.
+Una ejecución activa bloquea cambiar categoría o abandonar respuesta. Las versiones retiradas bloquean avance salvo continuidad autorizada para el aviso de seguridad vigente. Aprobaciones, evidencias y omisiones conservan sus controles específicos.
 
 **531/531 pruebas correctas en PostgreSQL 17 y 18**, sin fallidas ni omitidas; 41 nuevas y 90 enfocadas de ejecución/ciclo de vida. Compilación limpia, EF sin diferencias y migración local tras respaldo/restauración verificados; datos conservados. Las iteraciones 7–14 siguen locales, sin nuevo commit/push. En esta entrega las evidencias, aprobaciones y excepciones seguían pendientes. La aprobación de pasos se incorpora en la Iteración 15.
 
@@ -259,6 +259,53 @@ La [Iteración 17](OpenIRP_Documentacion/Iteracion17_Archivos_Privados_Evidencia
 ci/Start-LocalApi.ps1 configura por defecto .openirp-data/evidence (ignorado por Git/grafos); admite -EvidenceRoot y la variable EvidenceFiles__RootPath. Usando otro arranque, configurar una raíz absoluta privada. La validación de formatos/hash no sustituye antivirus. RESTRICTED y purga siguen pendientes.
 
 **639/639 de regresión completa en PostgreSQL 17 y 18.3; 36/36 finales de archivos por motor después del ajuste de commits inciertos.** Son conjuntos superpuestos, no se suman. Compilación limpia, EF sin diferencias; 18 migraciones locales tras respaldo/restauración verificados, datos conservados y sin archivos ficticios en la base habitual. HTTPS: 51 operaciones comprobadas, anónimos 401. Sin nuevo commit/push.
+
+### Omisiones autorizadas de tareas
+
+La [Iteración 18](OpenIRP_Documentacion/Iteracion18_Omisiones_Autorizadas.md) incorpora solicitud y decisión
+SKIP_AUTHORIZATION con impacto, riesgo residual y contexto de dependencias. ORG_ADMIN revisa cada omisión;
+la autoaprobación exige excepción justificada. La aprobación cambia la tarea a SKIPPED transaccionalmente.
+Un paso omitido no satisface dependencias ni equivale a una acción completada. Finalizar la ejecución no cierra el incidente.
+
+Cualquier cambio intermedio del incidente/ejecución invalida el contexto de la solicitud. Se conserva el historial.
+Las tres rutas de solicitud, decisión y consulta aparecen también en [Swagger local](OpenIRP_Documentacion/Swagger_Local.md).
+Las excepciones individuales y su revocación están implementadas. Siguen pendientes alternativas verificadas y suficiencia técnica; la evaluación y aceptación de riesgo de cierre está implementada en la Iteración 26; la continuidad por seguridad se describe en la Iteración 23.
+Los cambios nuevos continúan locales.
+
+### Cobertura declarada de capacidades
+
+La [Iteración 19](OpenIRP_Documentacion/Iteracion19_Cobertura_Capacidades_Ejecucion.md) compara los requisitos
+de ejecución/tarea con las capacidades efectivas actuales del incidente. Expone disponibilidad declarada,
+brechas, desconocidos, referencias inactivas y contexto de revisión, conservando REQUIRED/RECOMMENDED y limitaciones.
+
+Son dos consultas GET autorizadas, sin cambios de datos ni migraciones. RequiresHumanReview permanece true:
+el resultado no otorga permisos ni sustituye evidencia, aprobaciones, dependencias o revisión técnica.
+Los estados y requisitos históricos se conservan; el perfil y catálogo mostrados corresponden a la lectura actual.
+
+### Excepciones individuales de dependencias
+
+La [Iteración 20](OpenIRP_Documentacion/Iteracion20_Excepciones_Dependencias.md) permite solicitar y decidir
+una excepción para cada predecesor omitido. Exige revisión ORG_ADMIN, impacto, riesgo residual y contexto vigente.
+No modifica la versión ni marca al predecesor como completado; conserva aprobación de paso y evidencia.
+
+Una autorización se invalida al reasignar o cambiar el contexto relevante. Las alternativas verificadas siguen pendientes. La continuidad por seguridad se documenta en la Iteración 23. Las tres rutas están en Swagger Development.
+
+## Estado actual de dependencias
+
+GET `.../executions/{execution}/tasks/{task}/dependency-readiness` muestra predecesores directos,
+excepciones vigentes y metadatos de su última solicitud/decisión. Una aprobación histórica puede haber caducado.
+La satisfacción de dependencias no sustituye los otros controles de avance.
+[Contrato y alcance de Iteración 21](OpenIRP_Documentacion/Iteracion21_Vigencia_Dependencias.md).
+
+## Revocación de excepciones
+
+ORG_ADMIN puede revocar una aprobación de dependencia con motivo y revisiones vigentes. Si la tarea está en curso, queda BLOCKED en la misma transacción. El historial se conserva y una aprobación revocada no vuelve a habilitar su arista. GET dependency-readiness muestra la referencia de revocación.
+[API y verificaciones de Iteración 22](OpenIRP_Documentacion/Iteracion22_Revocacion_Excepciones.md).
+
+## Bloqueo de seguridad y continuidad
+
+La retirada explícita por seguridad genera un aviso identificado. ORG_ADMIN puede autorizar continuidad o cancelar una ejecución con el ID vigente, motivo y revisiones. Otro aviso invalida autorizaciones anteriores; se conservan aprobación de paso, dependencias y evidencia.
+[API y verificación de Iteración 23](OpenIRP_Documentacion/Iteracion23_Bloqueo_Seguridad_Continuidad.md).
 
 ## Alcance y limitaciones
 
@@ -345,6 +392,56 @@ OpenIRP se propone distribuir bajo la **GNU Affero General Public License v3.0 (
 Esta licencia permite el uso, modificación y distribución del software, incluyendo fines comerciales, bajo las condiciones establecidas en su texto.
 
 Consulta el archivo `LICENSE` para conocer los términos completos una vez incorporado al repositorio.
+
+## Preparación para el cierre de incidentes
+
+GET `/api/organizations/{organization}/incidents/{incident}/closure-readiness` reúne los controles actuales,
+las acciones disponibles al lector y conteos de ejecuciones, tareas y evidencias en una instantánea consistente.
+Es informativo: requiere revisión humana y no certifica riesgo residual ni integridad física de archivos.
+[Contrato, límites y verificaciones de Iteración 24](OpenIRP_Documentacion/Iteracion24_Preparacion_Cierre.md).
+
+La [Iteración 25](OpenIRP_Documentacion/Iteracion25_Contexto_Revision_Cierre.md) agrega closureContextToken y
+expectedClosureContext opcional en las tres escrituras de cierre para detectar contexto desactualizado.
+La [Iteración 26](OpenIRP_Documentacion/Iteracion26_Evaluacion_Riesgo_Cierre.md) exige evaluación y aceptación
+vigente de ORG_ADMIN en TODOS los cierres. GET/POST `.../incidents/{incident}/closure-risk-reviews` consulta
+historia y registra evaluación explícita; rechazo o contexto cambiado impiden cerrar. La aprobación adicional
+por máximo histórico HIGH/CRITICAL se conserva. Historial inmutable y guards SQL; sin inventar evaluaciones
+para cierres anteriores. La huella por sí sola no es aceptación de riesgo.
+
+La [Iteración 27](OpenIRP_Documentacion/Iteracion27_Soporte_Evidencias_Ejecucion.md) añade GET
+`.../incidents/{incident}/executions/{execution}/evidence-readiness`: soporte actual de evidencia seleccionada
+por tarea, referencias retiradas y metadatos FILE no disponibles, en una instantánea con RiskContextToken.
+Requiere revisión humana; no certifica integridad física ni suficiencia técnica y no modifica el cierre.
+
+## Funciones manuales previas a IA
+
+Las [iteraciones 28–32](OpenIRP_Documentacion/Entrega_PreIA_Iteraciones28_32.md) incorporan revisión técnica humana
+de evidencias y alternativas por tarea, con método, soporte, decisión y contexto vigente. GET
+`.../executions/{execution}/operational-reviews` consulta historia; POST
+`.../executions/{execution}/tasks/{task}/operational-reviews` registra revisión ORG_ADMIN local.
+Una alternativa validada conserva la autorización independiente de cada excepción de dependencia.
+
+Los avisos de seguridad se heredan transitivamente por procedencia y exigen una decisión por ejecución;
+el receptor recibe un aviso genérico. RESTRICTED se habilita exclusivamente para ORG_ADMIN local,
+incluidos metadatos FILE y descarga; PLATFORM_ADMIN no obtiene acceso implícito.
+
+POST `.../evidence/{evidence}/file/verification` verifica bytes administrativamente y deja auditoría;
+no libera cuarentenas ni elimina archivos. `ci/Inspect-EvidenceStorage.ps1` diagnostica objetos/temporales
+sin purga, con raíz explícita, límites y salida nueva. Ninguna de estas operaciones integra IA local,
+ejecuta acciones externas ni certifica automáticamente suficiencia técnica o ausencia de malware.
+
+## IA local: explicación supervisada de pasos
+
+La [Iteración 33](OpenIRP_Documentacion/Iteracion33_Asistencia_Local_Explicacion_Pasos.md) incorpora GET
+`.../tasks/{task}/assistance-context`, POST `.../tasks/{task}/assistance` y GET
+`.../tasks/{task}/assistance-assessments`. Usa solo **qwen3:4b-instruct sin thinking**, con `think=false`
+y `/no_think`, contexto mínimo autorizado y respuesta estructurada no confiable hasta revisión humana.
+No ejecuta tareas, cambia controles ni guarda respuestas originales. Los fallos conservan el trabajo manual.
+
+Está deshabilitada por defecto. Para probar con el modelo local ya instalado: establecer
+`$env:LocalAI__Enabled='true'` en PowerShell y ejecutar `./ci/Start-LocalApi.ps1`.
+La guía detalla permisos, precondiciones y límites; aceptar/rechazar definitivamente y convertir propuestas
+siguen pendientes. La etiqueta base qwen3:4b no se usa como alternativa.
 
 ## Aviso de seguridad
 

@@ -10,13 +10,13 @@ namespace OpenIRP.Infrastructure.Incidents;
 
 public sealed partial class IncidentService
 {
-    private async Task<Guid?> FileRequestScope(Incident parent, RegisterFileEvidence request, CancellationToken ct)
+    private async Task<Guid?> FileRequestScope(Guid actor,Incident parent, RegisterFileEvidence request, CancellationToken ct)
     {
         Reason(request.Reason);
         if(parent.Revision!=request.ExpectedIncidentRevision) throw Error(409,"stale_incident_revision");
         if(parent.Status is "CLOSED" or "DISCARDED") throw Error(409,"terminal_incident_requires_reopening");
         if(!Enum.IsDefined(request.Classification)) throw Error(400,"invalid_evidence_type_or_classification");
-        if(request.Classification==EvidenceClassification.Restricted) throw Error(409,"restricted_evidence_policy_pending");
+        if(request.Classification==EvidenceClassification.Restricted && !await IsEvidenceAdmin(actor,parent.OrganizationId,ct)) throw Error(403,"restricted_evidence_admin_required");
         if(string.IsNullOrWhiteSpace(request.Title) || request.Title.Length>200 || request.Title.Contains('\0')) throw Error(400,"invalid_evidence_content");
         if((request.ExecutionId is null)!=(request.TaskId is null)) throw Error(400,"incomplete_evidence_task_scope");
         if(request.TaskId is not Guid task) return null;
@@ -51,7 +51,7 @@ public sealed partial class IncidentService
             await AuthorizeAsync(actor,organization,write,ct);
             if(admin) await FileAdmin(actor,organization,ct);
             await FindAsync(organization,incident,ct);
-            var row=await FindEvidence(organization,incident,evidence,ct);
+            var row=await ActorEvidence(actor,organization,incident,evidence,ct);
             var file=await FindFile(organization,incident,evidence,ct);
             var result=await operation(row,file);
             db.AuditEvents.Add(audit.Success(new(action,actor,organization,"evidence",evidence),
@@ -96,7 +96,7 @@ public sealed partial class IncidentService
         await EvidenceRead(actor,organization,incident,async()=>
         {
             await AuthorizeAsync(actor,organization,true,ct);
-            return await FileRequestScope(await FindAsync(organization,incident,ct),request,ct);
+            return await FileRequestScope(actor,await FindAsync(organization,incident,ct),request,ct);
         },ct);
         StagedEvidenceFile stage;
         try {stage=await files.StageAsync(source,name,contentType,ct);}
@@ -110,7 +110,7 @@ public sealed partial class IncidentService
             await WriteAsync(actor,organization,incident,"EVIDENCE_REGISTERED",async()=>
             {
                 var parent=await FindAsync(organization,incident,ct);
-                var version=await FileRequestScope(parent,request,ct); Next(parent,request.ExpectedIncidentRevision);
+                var version=await FileRequestScope(actor,parent,request,ct); Next(parent,request.ExpectedIncidentRevision);
                 row=new(){OrganizationId=organization,IncidentId=incident,ExecutionId=request.ExecutionId,TaskId=request.TaskId,VersionId=version,
                     Kind="FILE",Classification=request.Classification.ToString().ToUpperInvariant(),Title=request.Title.Trim(),Content="[file]",
                     CreatedByUserId=actor,CreatedAt=EvidenceNow()};
@@ -152,11 +152,12 @@ public sealed partial class IncidentService
     }
 
     public Task<EvidenceFileItem> FileMetadataAsync(Guid actor,Guid organization,Guid incident,Guid evidence,CancellationToken ct=default)=>
-        EvidenceRead(actor,organization,incident,async()=>FileView(await FindEvidence(organization,incident,evidence,ct),await FindFile(organization,incident,evidence,ct)),ct);
+        EvidenceRead(actor,organization,incident,async()=>FileView(await ActorEvidence(actor,organization,incident,evidence,ct),await FindFile(organization,incident,evidence,ct)),ct);
     public Task<IReadOnlyList<EvidenceFileEventItem>> FileEventsAsync(Guid actor,Guid organization,Guid incident,Guid evidence,long afterRevision=0,int limit=50,CancellationToken ct=default)=>
         EvidenceRead<IReadOnlyList<EvidenceFileEventItem>>(actor,organization,incident,async()=>
         {
             if(afterRevision<0 || limit is <1 or >100) throw Error(400,"invalid_evidence_pagination");
+            await ActorEvidence(actor,organization,incident,evidence,ct);
             await FindFile(organization,incident,evidence,ct);
             return await db.EvidenceFileEvents.AsNoTracking().Where(f=>f.OrganizationId==organization && f.IncidentId==incident
                 && f.EvidenceId==evidence && f.Revision>afterRevision).OrderBy(f=>f.Revision).Take(limit)
@@ -167,7 +168,7 @@ public sealed partial class IncidentService
         var file=await EvidenceRead(actor,organization,incident,async()=>
         {
             await AuthorizeAsync(actor,organization,true,ct);await FileAdmin(actor,organization,ct);Reason(request.Reason);
-            var row=await FindEvidence(organization,incident,evidence,ct);var current=await FindFile(organization,incident,evidence,ct);
+            var row=await ActorEvidence(actor,organization,incident,evidence,ct);var current=await FindFile(organization,incident,evidence,ct);
             if(row.Status!="ACTIVE") throw Error(409,"evidence_already_withdrawn");
             if(current.State=="QUARANTINED") throw Error(409,"evidence_file_quarantined");
             if(current.Revision!=request.ExpectedFileRevision) throw Error(409,"stale_evidence_file_revision");
@@ -185,7 +186,7 @@ public sealed partial class IncidentService
     {
         var snapshot=await EvidenceRead(actor,organization,incident,async()=>
         {
-            var row=await FindEvidence(organization,incident,evidence,ct);var file=await FindFile(organization,incident,evidence,ct);
+            var row=await ActorEvidence(actor,organization,incident,evidence,ct);var file=await FindFile(organization,incident,evidence,ct);
             if(row.Status!="ACTIVE" || file.State!="AVAILABLE") throw Error(409,"evidence_file_not_available");
             return (File:FileDescriptor(file),file.Revision);
         },ct);
@@ -215,9 +216,9 @@ public sealed partial class IncidentService
         var file=await FindFile(row.OrganizationId,row.IncidentId,row.Id,ct);
         if(file.State!="QUARANTINED") SetFileState(file,actor,"QUARANTINED","withdrawn",reason);
     }
-    private async Task VerifyCompletionFile(Guid organization,Guid incident,Guid evidence,CancellationToken ct)
+    private async Task VerifyCompletionFile(Guid actor,Guid organization,Guid incident,Guid evidence,CancellationToken ct)
     {
-        var row=await FindEvidence(organization,incident,evidence,ct);
+        var row=await ActorEvidence(actor,organization,incident,evidence,ct);
         if(row.Kind!="FILE") return;
         var file=await FindFile(organization,incident,evidence,ct);
         if(file.State!="AVAILABLE") throw Error(409,"evidence_file_not_available");

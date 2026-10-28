@@ -81,5 +81,13 @@ models/
 *.gguf
 *.safetensors
 
+# Graphify - resultados locales regenerables
+graphify-out/
+.graphifyignore
+
 # Private operational evidence storage
 .openirp-data/
+
+# Codex
+codex-out/
+.codex

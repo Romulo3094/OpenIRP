@@ -100,7 +100,6 @@ public sealed partial class IdentityAdministrationTests
 
     [Theory,Trait("Feature","Evidence")]
     [InlineData("file")]
-    [InlineData("restricted")]
     [InlineData("invalid_enum")]
     [InlineData("empty")]
     [InlineData("http")]
@@ -112,13 +111,12 @@ public sealed partial class IdentityAdministrationTests
         var request=new RegisterEvidence(EvidenceKind.Text,EvidenceClassification.Internal,"Título","Contenido",null,null,3,"Registro");
         request=invalid switch {
             "file"=>request with{Kind=EvidenceKind.File},
-            "restricted"=>request with{Classification=EvidenceClassification.Restricted},
             "invalid_enum"=>request with{Kind=(EvidenceKind)999},
             "empty"=>request with{Content=" "},
             "http"=>request with{Kind=EvidenceKind.Reference,Content="http://example.test"},
             "credentials"=>request with{Kind=EvidenceKind.Reference,Content="https://user:secret@example.test"},
             _=>request with{TaskId=Guid.NewGuid()} };
-        await Rejected(invalid is "file" or "restricted" ? 409:400,()=>Evidence(s=>s.RegisterAsync(f.Admin,f.Org,f.Incident.Id,request)));
+        await Rejected(invalid=="file" ? 409:400,()=>Evidence(s=>s.RegisterAsync(f.Admin,f.Org,f.Incident.Id,request)));
         Assert.Equal(0,await InScope((_,db)=>db.IncidentEvidence.CountAsync()));
     }
 
@@ -220,6 +218,7 @@ public sealed partial class IdentityAdministrationTests
         inc=await CompleteSeverityInputs(f.Admin,f.Org,inc,ImpactLevel.High,IncidentCriticality.High);
         inc=await Incidents(s=>s.AssignAsync(f.Admin,f.Org,inc.Id,new(f.Membership,"Responsable",inc.Revision)));
         inc=await MoveWorkflow(f.Admin,f.Org,inc,IncidentState.Resolved,"Resolución");
+        inc=await AcceptRiskForTest(f.Admin,f.Org,inc);
         inc=await Incidents(s=>s.RequestClosureAsync(f.Admin,f.Org,inc.Id,new("Revisión de cierre",inc.Revision)));
         // Use the existing workflow helper contract for high-severity approval below.
         var closed=await Incidents(s=>s.DecideClosureAsync(f.Admin,f.Org,inc.Id,inc.ClosureReview!.Id,

@@ -11,7 +11,7 @@ using OpenIRP.Infrastructure.Persistence;
 
 namespace OpenIRP.Infrastructure.Incidents;
 
-public sealed partial class IncidentService(OpenIrpDbContext db, AuditRecorder audit, AuditContext context, IPrivateEvidenceStore files) : IIncidentService, IEvidenceService, IFileEvidenceService, OpenIRP.Application.Executions.IExecutionService
+public sealed partial class IncidentService(OpenIrpDbContext db, AuditRecorder audit, AuditContext context, IPrivateEvidenceStore files, OpenIRP.Application.Assistance.ILocalAssistant assistant) : IIncidentService, IEvidenceService, IFileEvidenceService, OpenIRP.Application.Executions.IExecutionService, OpenIRP.Application.Assistance.IAssistanceService
 {
     private static IdentityOperationException Error(int status, string code) => new(status, code);
 

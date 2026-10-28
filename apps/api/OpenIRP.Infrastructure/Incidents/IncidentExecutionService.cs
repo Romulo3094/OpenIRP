@@ -46,6 +46,7 @@ public sealed partial class IncidentService
             if (playbook.CurrentPublishedVersionId != request.VersionId) throw Error(409, "execution_version_not_current");
             var version = await db.PlaybookVersions.AsNoTracking().SingleOrDefaultAsync(v => v.Id == request.VersionId && v.PlaybookId == playbook.Id, ct)
                 ?? throw Error(404, "execution_version_not_found");
+            if (await EffectiveHold(version.Id,null,ct) is not null) throw Error(409,"security_held_source");
             if (version.Status != "PUBLISHED" || version.PublishedAt is null) throw Error(409, "execution_version_not_published");
             if (version.CategoryId != entity.CategoryId || !await db.IncidentCategories.AnyAsync(c => c.Id == version.CategoryId && c.IsActive, ct))
                 throw Error(409, "execution_category_mismatch_or_inactive");
@@ -90,7 +91,7 @@ public sealed partial class IncidentService
     }
     private async Task RequireUsableExecution(PlaybookExecution execution, CancellationToken ct)
     {
-        if (!await db.PlaybookVersions.AnyAsync(v => v.Id == execution.VersionId && v.Status == "PUBLISHED", ct))
+        if (!await db.Database.SqlQuery<bool>($"""SELECT app.execution_version_usable({execution.Id}) AS "Value" """).SingleAsync(ct))
             throw Error(409, "execution_version_withdrawn");
     }
 
@@ -101,10 +102,11 @@ public sealed partial class IncidentService
             var entity = await ActiveExecution(organization, incident, execution, request.ExpectedExecutionRevision, ct);
             await RequireUsableExecution(entity, ct);
             var item = await FindTask(entity, task, ct);
-            if (item.Status == "COMPLETED") throw Error(409, "execution_task_is_terminal");
+            if (item.Status is "COMPLETED" or "SKIPPED") throw Error(409, "execution_task_is_terminal");
             if (item.Status == "IN_PROGRESS" && request.AssignedMembershipId is null) throw Error(409, "execution_task_assignee_required");
             if (request.AssignedMembershipId is Guid id) await EligibleMembership(organization, id, null, ct);
-            if (item.Status == "IN_PROGRESS" && await db.PlaybookSteps.AnyAsync(s => s.Id == item.StepId && s.RequiresApproval, ct))
+            if (item.Status == "IN_PROGRESS" && (await db.PlaybookSteps.AnyAsync(s => s.Id == item.StepId && s.RequiresApproval, ct)
+                || await db.DependencyExceptions.AnyAsync(a => a.TaskId == item.Id && a.Action == "APPROVED", ct)))
                 throw Error(409, "block_task_before_reassignment");
             item.AssignedMembershipId = request.AssignedMembershipId; item.ChangedAtRevision = entity.Revision;
             return (entity, item);
@@ -132,9 +134,7 @@ public sealed partial class IncidentService
             if (!valid) throw Error(409, "invalid_execution_task_transition");
             if (target is "IN_PROGRESS" or "COMPLETED")
             {
-                if (await db.PlaybookStepDependencies.AnyAsync(d => d.VersionId == entity.VersionId && d.SuccessorId == item.StepId &&
-                    !db.ExecutionTasks.Any(t => t.ExecutionId == entity.Id && t.StepId == d.PredecessorId && t.Status == "COMPLETED"), ct))
-                    throw Error(409, "execution_dependencies_not_completed");
+                await RequireExecutionDependencies(entity, item, ct);
                 var step = await db.PlaybookSteps.AsNoTracking().SingleAsync(s => s.Id == item.StepId && s.VersionId == entity.VersionId, ct);
                 if (step.RequiresApproval && !await HasStepApproval(item, ct)) throw Error(409, "task_approval_required");
                 if (target == "COMPLETED" && step.RequiresEvidence && request.CompletionEvidenceId is null) throw Error(409, "task_evidence_required");
@@ -146,7 +146,7 @@ public sealed partial class IncidentService
                     && e.VersionId == entity.VersionId && e.ExecutionId == execution && e.TaskId == task && e.Status == "ACTIVE"
                     && (e.Kind != "FILE" || db.EvidenceFiles.Any(f => f.EvidenceId == e.Id && f.State == "AVAILABLE")), ct))
                     throw Error(409, "active_task_evidence_required");
-                await VerifyCompletionFile(organization, incident, evidence, ct);
+                await VerifyCompletionFile(actor, organization, incident, evidence, ct);
                 item.CompletionEvidenceId = evidence;
             }
             item.Status = target; item.ChangedAtRevision = entity.Revision;
@@ -163,6 +163,7 @@ public sealed partial class IncidentService
             var entity = await ActiveExecution(organization, incident, execution, request.ExpectedExecutionRevision, ct);
             if (cancel)
             {
+                if (await EffectiveHold(entity.VersionId,null,ct) is not null) throw Error(409,"security_hold_decision_required");
                 var withdrawn = !await db.PlaybookVersions.AnyAsync(v => v.Id == entity.VersionId && v.Status == "PUBLISHED", ct);
                 if (withdrawn && !await db.OrganizationMemberships.AnyAsync(m => m.OrganizationId == organization && m.UserId == actor
                     && m.Status == MembershipStatus.Active && m.Role == OrganizationRole.OrgAdmin, ct)) throw Error(403, "organization_admin_required");
@@ -170,7 +171,7 @@ public sealed partial class IncidentService
             else
             {
                 await RequireUsableExecution(entity, ct);
-                if (await db.ExecutionTasks.AnyAsync(t => t.ExecutionId == entity.Id && t.Status != "COMPLETED", ct))
+                if (await db.ExecutionTasks.AnyAsync(t => t.ExecutionId == entity.Id && t.Status != "COMPLETED" && t.Status != "SKIPPED", ct))
                     throw Error(409, "execution_tasks_not_completed");
             }
             entity.Status = cancel ? "CANCELLED" : "COMPLETED"; entity.FinishReason = request.Reason.Trim();

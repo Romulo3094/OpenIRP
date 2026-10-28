@@ -23,6 +23,9 @@ public sealed class OpenIrpDbContext : IdentityDbContext<ApplicationUser, Identi
     public DbSet<IncidentCategory> IncidentCategories => Set<IncidentCategory>();
     public DbSet<OrganizationCapability> OrganizationCapabilities => Set<OrganizationCapability>();
     public DbSet<Asset> Assets => Set<Asset>();
+    public DbSet<AssistanceAssessment> AssistanceAssessments => Set<AssistanceAssessment>();
+    public DbSet<OperationalReview> OperationalReviews => Set<OperationalReview>();
+    public DbSet<ClosureRiskReview> ClosureRiskReviews => Set<ClosureRiskReview>();
     public DbSet<Incident> Incidents => Set<Incident>();
     public DbSet<IncidentAsset> IncidentAssets => Set<IncidentAsset>();
     public DbSet<IncidentCapabilityAssessment> IncidentCapabilityAssessments => Set<IncidentCapabilityAssessment>();
@@ -34,6 +37,11 @@ public sealed class OpenIrpDbContext : IdentityDbContext<ApplicationUser, Identi
     public DbSet<EvidenceFileEvent> EvidenceFileEvents => Set<EvidenceFileEvent>();
     public DbSet<IncidentEvidence> IncidentEvidence => Set<IncidentEvidence>();
     public DbSet<EvidenceEvent> EvidenceEvents => Set<EvidenceEvent>();
+    public DbSet<PlaybookSecurityHold> PlaybookSecurityHolds => Set<PlaybookSecurityHold>();
+    public DbSet<ExecutionSecurityDecision> ExecutionSecurityDecisions => Set<ExecutionSecurityDecision>();
+    public DbSet<DependencyExceptionRevocation> DependencyExceptionRevocations => Set<DependencyExceptionRevocation>();
+    public DbSet<DependencyException> DependencyExceptions => Set<DependencyException>();
+    public DbSet<SkipAuthorization> SkipAuthorizations => Set<SkipAuthorization>();
     public DbSet<StepApproval> StepApprovals => Set<StepApproval>();
     public DbSet<ExecutionTaskEvent> ExecutionTaskEvents => Set<ExecutionTaskEvent>();
 
@@ -49,10 +57,25 @@ public sealed class OpenIrpDbContext : IdentityDbContext<ApplicationUser, Identi
     private void CheckAuditChanges()
     {
         ChangeTracker.DetectChanges();
+        if(ChangeTracker.Entries<AssistanceAssessment>().Any(e=>e.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("AI assessments are append-only.");
+        if (ChangeTracker.Entries<OperationalReview>().Any(e => e.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("Operational reviews are append-only.");
+        if (ChangeTracker.Entries<ClosureRiskReview>().Any(e => e.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("Closure risk reviews are append-only.");
         if (ChangeTracker.Entries<EvidenceFileEvent>().Any(e => e.State is EntityState.Modified or EntityState.Deleted))
             throw new InvalidOperationException("File events are append-only.");
         if (ChangeTracker.Entries<EvidenceEvent>().Any(e => e.State is EntityState.Modified or EntityState.Deleted))
             throw new InvalidOperationException("Evidence events are append-only.");
+        if (ChangeTracker.Entries<PlaybookSecurityHold>().Any(e=>e.State is EntityState.Modified or EntityState.Deleted) ||
+            ChangeTracker.Entries<ExecutionSecurityDecision>().Any(e=>e.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("Security hold history is append-only.");
+        if (ChangeTracker.Entries<DependencyExceptionRevocation>().Any(e => e.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("Dependency exception revocations are append-only.");
+        if (ChangeTracker.Entries<DependencyException>().Any(e => e.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("Dependency exceptions are append-only.");
+        if (ChangeTracker.Entries<SkipAuthorization>().Any(e => e.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("Skip authorizations are append-only.");
         if (ChangeTracker.Entries<StepApproval>().Any(e => e.State is EntityState.Modified or EntityState.Deleted))
             throw new InvalidOperationException("Step approvals are append-only.");
         if (ChangeTracker.Entries<ExecutionTaskEvent>().Any(e => e.State is EntityState.Modified or EntityState.Deleted))
@@ -87,11 +110,18 @@ public sealed class OpenIrpDbContext : IdentityDbContext<ApplicationUser, Identi
         ConfigureAudit(builder);
         InventoryMapping.Apply(builder);
         IncidentMapping.Apply(builder);
+        ClosureRiskMapping.Apply(builder);
+        OperationalReviewMapping.Apply(builder);
+        AssistanceMapping.Apply(builder);
         IncidentAssetMapping.Apply(builder);
         IncidentCapabilityMapping.Apply(builder);
         PlaybookMapping.Apply(builder);
         ExecutionMapping.Apply(builder);
         StepApprovalMapping.Apply(builder);
+        SkipAuthorizationMapping.Apply(builder);
+        DependencyExceptionMapping.Apply(builder);
+        DependencyExceptionRevocationMapping.Apply(builder);
+        SecurityHoldMapping.Apply(builder);
         EvidenceMapping.Apply(builder);
         EvidenceFileMapping.Apply(builder);
     }

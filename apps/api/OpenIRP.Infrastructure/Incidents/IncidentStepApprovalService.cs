@@ -27,9 +27,7 @@ public sealed partial class IncidentService
             throw Error(409, "step_approval_not_required");
         if (task.AssignedMembershipId is not Guid assigned) throw Error(409, "execution_task_unassigned");
         await EligibleMembership(task.OrganizationId, assigned, null, ct);
-        if (await db.PlaybookStepDependencies.AnyAsync(d => d.VersionId == execution.VersionId && d.SuccessorId == task.StepId &&
-            !db.ExecutionTasks.Any(t => t.ExecutionId == execution.Id && t.StepId == d.PredecessorId && t.Status == "COMPLETED"), ct))
-            throw Error(409, "execution_dependencies_not_completed");
+        await RequireExecutionDependencies(execution, task, ct);
     }
     private void AddStepApproval(Guid actor, PlaybookExecution execution, ExecutionTask task, string action, string reason,
         Guid? request = null, bool self = false, string? justification = null)

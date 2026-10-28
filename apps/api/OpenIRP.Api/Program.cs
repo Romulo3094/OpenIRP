@@ -17,6 +17,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddScoped<OpenIRP.Application.Playbooks.IPlaybookDraftService, OpenIRP.Infrastructure.Playbooks.PlaybookDraftService>();
 builder.Services.AddControllersWithViews(options => options.Filters.Add(new AutoValidateAntiforgeryTokenAttribute()))
     .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+// OpenAPI uses HTTP JSON options; keep its enum schemas aligned with MVC responses.
+builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options =>
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddOpenApi();
 builder.Services.AddAntiforgery(o => o.HeaderName = "X-CSRF-TOKEN");
 builder.Services.AddDbContext<OpenIrpDbContext>((services, options) =>
@@ -59,6 +62,10 @@ builder.Services.AddScoped<OpenIRP.Application.Incidents.IEvidenceService, Incid
 builder.Services.AddScoped<OpenIRP.Application.Incidents.IFileEvidenceService, IncidentService>();
 builder.Services.AddSingleton<OpenIRP.Application.Incidents.IPrivateEvidenceStore, PrivateEvidenceStore>();
 builder.Services.AddScoped<OpenIRP.Application.Executions.IExecutionService, IncidentService>();
+builder.Services.AddSingleton<OpenIRP.Infrastructure.Assistance.LocalAiConcurrency>();
+builder.Services.AddHttpClient<OpenIRP.Application.Assistance.ILocalAssistant,OpenIRP.Infrastructure.Assistance.OllamaLocalAssistant>(client=>client.Timeout=Timeout.InfiniteTimeSpan)
+    .ConfigurePrimaryHttpMessageHandler(()=>new SocketsHttpHandler{UseProxy=false,AllowAutoRedirect=false,UseCookies=false,ConnectTimeout=TimeSpan.FromSeconds(5)});
+builder.Services.AddScoped<OpenIRP.Application.Assistance.IAssistanceService,IncidentService>();
 var app = builder.Build();
 
 // Explicit offline command: no startup seeding, HTTP listener, implicit migration or public bootstrap route.
@@ -82,7 +89,41 @@ if (args.Contains("--bootstrap-platform-admin"))
     catch (IdentityOperationException e) { Console.Error.WriteLine(e.Code); Environment.ExitCode = 1; }
     return;
 }
-if (app.Environment.IsDevelopment()) app.MapOpenApi();
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/openapi/v1.json", "OpenIRP API v1");
+        options.DocumentTitle = "OpenIRP API — Swagger";
+        options.EnableValidator(null);
+        // Keep cookie authentication and acquire a fresh identity-bound token for every write.
+        options.UseRequestInterceptor("""
+            function (request) {
+                const target = new URL(request.url, window.location.href);
+                if (target.origin !== window.location.origin) {
+                    throw new Error("Swagger solo permite solicitudes al mismo origen.");
+                }
+                request.credentials = "same-origin";
+                const method = (request.method || "GET").toUpperCase();
+                if (!["GET", "HEAD", "OPTIONS", "TRACE"].includes(method)) {
+                    return fetch("/api/auth/csrf", {
+                        credentials: "same-origin", cache: "no-store"
+                    }).then(response => {
+                        if (!response.ok) throw new Error("No se pudo obtener el token CSRF.");
+                        return response.json();
+                    }).then(data => {
+                        if (!data.token) throw new Error("Token CSRF ausente.");
+                        request.headers = request.headers || {};
+                        request.headers["X-CSRF-TOKEN"] = data.token;
+                        return request;
+                    });
+                }
+                return request;
+            }
+            """);
+    });
+}
 app.Use(async (context, next) =>
 {
     var audit = context.RequestServices.GetRequiredService<AuditContext>();

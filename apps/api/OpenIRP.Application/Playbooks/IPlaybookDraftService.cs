@@ -29,6 +29,7 @@ public sealed record PlaybookPage(IReadOnlyList<PlaybookSummary> Items, int? Nex
 
 public interface IPlaybookDraftService
 {
+    Task<OpenIRP.Application.Executions.SecurityHoldItem> WithdrawForSecurityAsync(Guid actor, Guid? organization, Guid playbook, Guid version, PlaybookVersionCommand request, CancellationToken ct = default);
     Task<IReadOnlyList<PlaybookVersionSummary>> VersionsAsync(Guid actor, Guid? organization, Guid playbook, int afterNumber = 0, int limit = 50, CancellationToken ct = default);
     Task<PlaybookDraftItem> VersionAsync(Guid actor, Guid? organization, Guid playbook, Guid version, CancellationToken ct = default);
     Task<IReadOnlyList<PlaybookReviewItem>> ReviewsAsync(Guid actor, Guid? organization, Guid playbook, long afterRevision = 0, int limit = 50, CancellationToken ct = default);

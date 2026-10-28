@@ -35,6 +35,9 @@ public sealed record IncidentEventPage(IReadOnlyList<IncidentEventItem> Items, l
 
 public interface IIncidentService
 {
+    Task<ClosureRiskReviewItem> ReviewClosureRiskAsync(Guid actor, Guid organization, Guid incident, ReviewClosureRisk request, CancellationToken ct = default);
+    Task<IReadOnlyList<ClosureRiskReviewItem>> ClosureRiskHistoryAsync(Guid actor, Guid organization, Guid incident, long afterRevision = 0, int limit = 50, CancellationToken ct = default);
+    Task<IncidentClosureReadiness> ClosureReadinessAsync(Guid actor, Guid organization, Guid incident, CancellationToken ct = default);
     Task<IncidentItem> TransitionAsync(Guid actor, Guid organization, Guid incident, TransitionIncident request, CancellationToken ct = default);
     Task<IncidentItem> RequestClosureAsync(Guid actor, Guid organization, Guid incident, RequestIncidentClosure request, CancellationToken ct = default);
     Task<IncidentItem> DecideClosureAsync(Guid actor, Guid organization, Guid incident, Guid closureRequest, DecideIncidentClosure request, CancellationToken ct = default);

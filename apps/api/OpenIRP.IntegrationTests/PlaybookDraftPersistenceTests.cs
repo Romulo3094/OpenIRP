@@ -46,7 +46,7 @@ public sealed partial class IdentityAdministrationTests
             "version_owner" => "UPDATE app.playbook_versions SET playbook_id=gen_random_uuid()",
             "publish" => "UPDATE app.playbook_versions SET status='PUBLISHED'",
             "delete" => "DELETE FROM app.playbook_versions",
-            _ => "TRUNCATE app.playbook_step_dependencies,app.playbook_capability_requirements,app.playbook_steps,app.playbook_versions,app.playbooks,app.playbook_reviews,app.playbook_executions,app.execution_tasks,app.execution_task_events,app.step_approvals,app.incident_evidence,app.evidence_events,app.evidence_files,app.evidence_file_events"
+            _ => "TRUNCATE app.assistance_assessments,app.operational_reviews,app.playbook_security_holds,app.execution_security_decisions,app.playbook_step_dependencies,app.playbook_capability_requirements,app.playbook_steps,app.playbook_versions,app.playbooks,app.playbook_reviews,app.playbook_executions,app.execution_tasks,app.execution_task_events,app.step_approvals,app.skip_authorizations,app.dependency_exceptions,app.dependency_exception_revocations,app.incident_evidence,app.evidence_events,app.evidence_files,app.evidence_file_events"
         };
         var error = await Assert.ThrowsAsync<PostgresException>(() => InScope((_, db) => db.Database.ExecuteSqlRawAsync(query)));
         Assert.Equal(sqlState, error.SqlState);

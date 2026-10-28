@@ -12,10 +12,15 @@ public sealed partial class IncidentService
         TransitionIncident request, CancellationToken ct = default)
     {
         string? from = null;
+        Guid? riskReviewId = null;
         return WriteAsync(actor, organization, incident, "STATE_CHANGED", async () =>
         {
             var entity = await FindAsync(organization, incident, ct);
-            Reason(request.Reason); Next(entity, request.ExpectedRevision);
+            Reason(request.Reason);
+            if (request.ExpectedClosureContext is not null && request.TargetState != IncidentState.Closed)
+                throw Error(400, "unexpected_closure_context");
+            await CheckClosureContext(organization, incident, request.ExpectedClosureContext, ct);
+            Next(entity, request.ExpectedRevision);
             if (!Enum.IsDefined(request.TargetState)) throw Error(400, "invalid_incident_state");
             from = entity.Status;
             if (!IncidentWorkflow.CanTransition(from, request.TargetState)) throw Error(409, "invalid_incident_transition");
@@ -34,20 +39,25 @@ public sealed partial class IncidentService
                     await RequireAssignedWriterAsync(actor, entity, ct);
                     if (entity.MaximumSeverityReached is IncidentSeverity.High or IncidentSeverity.Critical)
                         throw Error(409, "closure_approval_required");
+                    riskReviewId = await RequireRiskAcceptance(entity, ct);
                 }
                 else entity.Resolution = null;
             }
             entity.Status = IncidentWorkflow.Store(request.TargetState);
             return (entity, request.Reason.Trim());
-        }, ct, () => JsonSerializer.Serialize(new { workflow = new { from, to = IncidentWorkflow.Store(request.TargetState) } }, DetailsOptions));
+        }, ct, () => JsonSerializer.Serialize(new { workflow = new { from, to = IncidentWorkflow.Store(request.TargetState) }, closureContextToken = request.ExpectedClosureContext, riskReviewId }, DetailsOptions));
     }
 
     public Task<IncidentItem> RequestClosureAsync(Guid actor, Guid organization, Guid incident,
-        RequestIncidentClosure request, CancellationToken ct = default) =>
-        WriteAsync(actor, organization, incident, "CLOSURE_REQUESTED", async () =>
+        RequestIncidentClosure request, CancellationToken ct = default)
+    {
+        Guid? riskReviewId = null;
+        return WriteAsync(actor, organization, incident, "CLOSURE_REQUESTED", async () =>
         {
             var entity = await FindAsync(organization, incident, ct);
-            Reason(request.Reason); Next(entity, request.ExpectedRevision);
+            Reason(request.Reason);
+            await CheckClosureContext(organization, incident, request.ExpectedClosureContext, ct);
+            Next(entity, request.ExpectedRevision);
             if (entity.Status != "RESOLVED") throw Error(409, "incident_not_resolved");
             RequireClassifiedResolution(entity);
             await RequireAssignedWriterAsync(actor, entity, ct);
@@ -55,6 +65,7 @@ public sealed partial class IncidentService
                 throw Error(409, "closure_approval_not_required");
             if (entity.ClosureReviewStatus == ClosureReviewStatus.Pending)
                 throw Error(409, "closure_request_already_pending");
+            riskReviewId = await RequireRiskAcceptance(entity, ct);
             entity.ClosureRequestId = Guid.NewGuid();
             entity.ClosureRequestRevision = entity.Revision;
             entity.ClosureRequestedByUserId = actor;
@@ -62,14 +73,19 @@ public sealed partial class IncidentService
             entity.ClosureDecidedByUserId = null; entity.ClosureDecisionRevision = null;
             entity.ClosureSelfApproval = null; entity.ClosureSelfApprovalJustification = null;
             return (entity, request.Reason.Trim());
-        }, ct);
+        }, ct, () => JsonSerializer.Serialize(new { closureContextToken = request.ExpectedClosureContext, riskReviewId }, DetailsOptions));
+    }
 
     public Task<IncidentItem> DecideClosureAsync(Guid actor, Guid organization, Guid incident, Guid closureRequest,
-        DecideIncidentClosure request, CancellationToken ct = default) =>
-        WriteAsync(actor, organization, incident, request.Approve ? "CLOSURE_APPROVED" : "CLOSURE_REJECTED", async () =>
+        DecideIncidentClosure request, CancellationToken ct = default)
+    {
+        Guid? riskReviewId = null;
+        return WriteAsync(actor, organization, incident, request.Approve ? "CLOSURE_APPROVED" : "CLOSURE_REJECTED", async () =>
         {
             var entity = await FindAsync(organization, incident, ct);
-            Reason(request.Reason); Next(entity, request.ExpectedRevision);
+            Reason(request.Reason);
+            await CheckClosureContext(organization, incident, request.ExpectedClosureContext, ct);
+            Next(entity, request.ExpectedRevision);
             if (!await db.OrganizationMemberships.AnyAsync(m => m.OrganizationId == organization && m.UserId == actor
                 && m.Status == MembershipStatus.Active && m.Role == OrganizationRole.OrgAdmin, ct))
                 throw Error(403, "organization_admin_required");
@@ -88,6 +104,7 @@ public sealed partial class IncidentService
                 await RequireAssignedWriterAsync(entity.ClosureRequestedByUserId!.Value, entity, ct);
                 if (entity.MaximumSeverityReached is not (IncidentSeverity.High or IncidentSeverity.Critical))
                     throw Error(409, "closure_approval_not_required");
+                riskReviewId = await RequireRiskAcceptance(entity, ct);
                 entity.Status = "CLOSED";
             }
             entity.ClosureReviewStatus = request.Approve ? ClosureReviewStatus.Approved : ClosureReviewStatus.Rejected;
@@ -95,16 +112,19 @@ public sealed partial class IncidentService
             entity.ClosureSelfApproval = self;
             entity.ClosureSelfApprovalJustification = self ? request.SelfApprovalJustification!.Trim() : null;
             return (entity, request.Reason.Trim());
-        }, ct);
+        }, ct, () => JsonSerializer.Serialize(new { closureContextToken = request.ExpectedClosureContext, riskReviewId }, DetailsOptions));
+    }
 
     private static void RequireClassifiedResolution(Incident entity)
     {
         if (string.IsNullOrWhiteSpace(entity.Resolution)) throw Error(409, "incident_resolution_required");
-        if (entity.Severity is null || entity.MaximumSeverityReached is null || entity.SeverityRuleVersion != SeverityRuleV1.Version
-            || entity.ConfidentialityImpact is null || entity.IntegrityImpact is null || entity.AvailabilityImpact is null
-            || entity.Scope is null || entity.OperationalImpact is null || entity.AssessedCriticality is null)
-            throw Error(409, "incident_classification_pending");
+        if (!ClassificationComplete(entity)) throw Error(409, "incident_classification_pending");
     }
+
+    private static bool ClassificationComplete(Incident entity) =>
+        entity.Severity is not null && entity.MaximumSeverityReached is not null && entity.SeverityRuleVersion == SeverityRuleV1.Version
+        && entity.ConfidentialityImpact is not null && entity.IntegrityImpact is not null && entity.AvailabilityImpact is not null
+        && entity.Scope is not null && entity.OperationalImpact is not null && entity.AssessedCriticality is not null;
 
     private async Task RequireAssignedWriterAsync(Guid actor, Incident entity, CancellationToken ct)
     {

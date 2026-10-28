@@ -3,6 +3,7 @@
 -- Creates no users, passwords or business roles; does not grant membership in other SQL roles.
 DO $permissions$
 DECLARE
+    table_name text;
     runtime_name text := current_setting('openirp.runtime_role');
     runtime_id oid;
 BEGIN
@@ -45,6 +46,31 @@ BEGIN
         EXECUTE format('GRANT SELECT, INSERT ON TABLE app.incident_evidence, app.evidence_events TO %I', runtime_name);
         EXECUTE format('GRANT UPDATE (status, revision, withdrawn_by_user_id, withdrawn_at, withdrawal_reason) ON TABLE app.incident_evidence TO %I', runtime_name);
         EXECUTE format('GRANT UPDATE (completion_evidence_id) ON TABLE app.execution_tasks TO %I', runtime_name);
+    END IF;
+    FOREACH table_name IN ARRAY ARRAY['playbook_security_holds','execution_security_decisions','closure_risk_reviews'] LOOP
+        IF to_regclass('app.'||table_name) IS NOT NULL THEN
+            EXECUTE format('GRANT SELECT, INSERT ON TABLE app.%I TO %I',table_name,runtime_name);
+        END IF;
+    END LOOP;
+    IF to_regclass('app.dependency_exception_revocations') IS NOT NULL THEN
+        EXECUTE format('REVOKE ALL ON TABLE app.dependency_exception_revocations FROM %I', runtime_name);
+        EXECUTE format('GRANT SELECT, INSERT ON TABLE app.dependency_exception_revocations TO %I', runtime_name);
+    END IF;
+    IF to_regclass('app.dependency_exceptions') IS NOT NULL THEN
+        EXECUTE format('REVOKE ALL ON TABLE app.dependency_exceptions FROM %I', runtime_name);
+        EXECUTE format('GRANT SELECT, INSERT ON TABLE app.dependency_exceptions TO %I', runtime_name);
+    END IF;
+    IF to_regclass('app.assistance_assessments') IS NOT NULL THEN
+        EXECUTE format('REVOKE ALL ON TABLE app.assistance_assessments FROM %I',runtime_name);
+        EXECUTE format('GRANT SELECT, INSERT ON TABLE app.assistance_assessments TO %I',runtime_name);
+    END IF;
+    IF to_regclass('app.operational_reviews') IS NOT NULL THEN
+        EXECUTE format('REVOKE ALL ON TABLE app.operational_reviews FROM %I',runtime_name);
+        EXECUTE format('GRANT SELECT, INSERT ON TABLE app.operational_reviews TO %I',runtime_name);
+    END IF;
+    IF to_regclass('app.skip_authorizations') IS NOT NULL THEN
+        EXECUTE format('REVOKE ALL ON TABLE app.skip_authorizations FROM %I', runtime_name);
+        EXECUTE format('GRANT SELECT, INSERT ON TABLE app.skip_authorizations TO %I', runtime_name);
     END IF;
     IF to_regclass('app.step_approvals') IS NOT NULL THEN
         EXECUTE format('REVOKE ALL ON TABLE app.step_approvals FROM %I', runtime_name);

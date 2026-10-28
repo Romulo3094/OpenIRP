@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using OpenIRP.Application.Identity;
+using OpenIRP.Application.Audit;
 using OpenIRP.Application.Playbooks;
 using OpenIRP.Domain.Entities;
 using OpenIRP.Domain.Playbooks;
@@ -12,7 +13,7 @@ using OpenIRP.Infrastructure.Persistence;
 
 namespace OpenIRP.Infrastructure.Playbooks;
 
-public sealed partial class PlaybookDraftService(OpenIrpDbContext db, AuditRecorder audit) : IPlaybookDraftService
+public sealed partial class PlaybookDraftService(OpenIrpDbContext db, AuditRecorder audit, AuditContext context) : IPlaybookDraftService
 {
     private static IdentityOperationException Error(int status, string code) => new(status, code);
     private async Task Authorize(Guid actor, Guid? organization, CancellationToken ct)

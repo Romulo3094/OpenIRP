@@ -25,6 +25,14 @@ public sealed partial class IncidentService
         await db.IncidentEvidence.SingleOrDefaultAsync(e=>e.OrganizationId==organization && e.IncidentId==incident && e.Id==id,ct)
             ?? throw Error(404,"evidence_not_found");
 
+    private Task<bool> IsEvidenceAdmin(Guid actor,Guid org,CancellationToken ct) => db.OrganizationMemberships.AnyAsync(m =>
+        m.OrganizationId==org && m.UserId==actor && m.Role==OrganizationRole.OrgAdmin && m.Status==MembershipStatus.Active,ct);
+    private async Task<IncidentEvidence> ActorEvidence(Guid actor,Guid org,Guid inc,Guid id,CancellationToken ct)
+    {
+        var row=await FindEvidence(org,inc,id,ct);
+        if(row.Classification=="RESTRICTED" && !await IsEvidenceAdmin(actor,org,ct)) throw Error(404,"evidence_not_found");
+        return row;
+    }
     public async Task<EvidenceResult> RegisterAsync(Guid actor, Guid organization, Guid incident, RegisterEvidence request, CancellationToken ct = default)
     {
         IncidentEvidence? row=null;
@@ -34,7 +42,7 @@ public sealed partial class IncidentService
             Reason(request.Reason); Next(entity,request.ExpectedIncidentRevision);
             if(!Enum.IsDefined(request.Kind) || !Enum.IsDefined(request.Classification)) throw Error(400,"invalid_evidence_type_or_classification");
             if(request.Kind==EvidenceKind.File) throw Error(409,"file_evidence_not_available");
-            if(request.Classification==EvidenceClassification.Restricted) throw Error(409,"restricted_evidence_policy_pending");
+            if(request.Classification==EvidenceClassification.Restricted && !await IsEvidenceAdmin(actor,organization,ct)) throw Error(403,"restricted_evidence_admin_required");
             if(string.IsNullOrWhiteSpace(request.Title) || request.Title.Length>200 || string.IsNullOrWhiteSpace(request.Content) || request.Content.Length>16000
                 || request.Content.Contains('\0') || request.Title.Contains('\0')) throw Error(400,"invalid_evidence_content");
             var body=request.Content.Trim();
@@ -113,12 +121,13 @@ public sealed partial class IncidentService
         { await audit.RejectedAsync(new("evidence.read",actor,organization,"incident",incident),e); throw; }
     }
     public Task<EvidenceItem> GetEvidenceAsync(Guid actor,Guid organization,Guid incident,Guid evidence,CancellationToken ct=default) =>
-        EvidenceRead(actor,organization,incident,async()=>EvidenceView(await FindEvidence(organization,incident,evidence,ct)),ct);
+        EvidenceRead(actor,organization,incident,async()=>EvidenceView(await ActorEvidence(actor,organization,incident,evidence,ct)),ct);
     public Task<EvidencePage> ListEvidenceAsync(Guid actor,Guid organization,Guid incident,int skip=0,int limit=50,CancellationToken ct=default) =>
         EvidenceRead(actor,organization,incident,async()=>
         {
             if(skip is <0 or >1000000 || limit is <1 or >100) throw Error(400,"invalid_evidence_pagination");
-            var rows=await db.IncidentEvidence.AsNoTracking().Where(e=>e.OrganizationId==organization && e.IncidentId==incident)
+            var admin=await IsEvidenceAdmin(actor,organization,ct);
+            var rows=await db.IncidentEvidence.AsNoTracking().Where(e=>e.OrganizationId==organization && e.IncidentId==incident && (admin || e.Classification!="RESTRICTED"))
                 .OrderBy(e=>e.Id).Skip(skip).Take(limit+1).ToListAsync(ct);
             return new EvidencePage(rows.Take(limit).Select(e=>EvidenceView(e,false)).ToList(),rows.Count>limit ? skip+limit : null);
         },ct);
@@ -126,7 +135,7 @@ public sealed partial class IncidentService
         EvidenceRead<IReadOnlyList<EvidenceEventItem>>(actor,organization,incident,async()=>
         {
             if(afterRevision<0 || limit is <1 or >100) throw Error(400,"invalid_evidence_pagination");
-            await FindEvidence(organization,incident,evidence,ct);
+            await ActorEvidence(actor,organization,incident,evidence,ct);
             return await db.EvidenceEvents.AsNoTracking().Where(e=>e.OrganizationId==organization && e.IncidentId==incident && e.EvidenceId==evidence && e.Revision>afterRevision)
                 .OrderBy(e=>e.Revision).Take(limit).Select(e=>new EvidenceEventItem(e.Id,e.Revision,e.Action,e.ActorUserId,e.CorrelationId,e.Reason,e.OccurredAt)).ToListAsync(ct);
         },ct);

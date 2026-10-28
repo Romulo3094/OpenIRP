@@ -20,8 +20,17 @@ public interface IPrivateEvidenceStore
     Task<Stream> OpenVerifiedAsync(StagedEvidenceFile file, CancellationToken ct);
     Task DiscardUnregisteredAsync(Guid storageId);
 }
+public sealed record VerifyEvidenceFile([property: JsonRequired] long ExpectedFileRevision, string Reason);
+public sealed record EvidenceFileVerification(Guid EvidenceId, long Revision, string State, bool PhysicalIntegrityVerified,
+    bool DownloadAllowed, DateTimeOffset CheckedAt, string? FailureCode)
+{
+    public bool MalwareScanned => false;
+    public bool TechnicalSufficiencyVerified => false;
+    public string RetentionPolicy => "RETAIN_NO_AUTOMATIC_PURGE";
+}
 public interface IFileEvidenceService
 {
+    Task<EvidenceFileVerification> VerifyFileAsync(Guid actor, Guid organization, Guid incident, Guid evidence, VerifyEvidenceFile request, CancellationToken ct = default);
     Task<FileEvidenceResult> UploadAsync(Guid actor, Guid organization, Guid incident, RegisterFileEvidence request,
         Stream source, string name, string contentType, CancellationToken ct = default);
     Task<EvidenceFileItem> FileMetadataAsync(Guid actor, Guid organization, Guid incident, Guid evidence, CancellationToken ct = default);

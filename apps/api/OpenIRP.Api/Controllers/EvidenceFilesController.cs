@@ -40,6 +40,9 @@ public sealed class EvidenceFilesController(IFileEvidenceService service):Contro
         var result=await service.RecoverFileAsync(Actor,organization,incident,evidence,request,ct);
         return result.State=="AVAILABLE" ? Ok(result):StatusCode(202,result);
     }
+    [HttpPost("{evidence:guid}/file/verification")]
+    public async Task<ActionResult<EvidenceFileVerification>> Verify(Guid organization,Guid incident,Guid evidence,VerifyEvidenceFile request,CancellationToken ct) =>
+        Ok(await service.VerifyFileAsync(Actor,organization,incident,evidence,request,ct));
     [HttpGet("{evidence:guid}/file/download")]
     public async Task<IActionResult> Download(Guid organization,Guid incident,Guid evidence,CancellationToken ct)
     {

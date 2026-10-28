@@ -10,6 +10,17 @@ namespace OpenIRP.Api.Controllers;
 public sealed class IncidentWorkflowController(IIncidentService service) : ControllerBase
 {
     private Guid Actor => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    [HttpGet("closure-readiness")]
+    public Task<IncidentClosureReadiness> Readiness(Guid organization, Guid incident, CancellationToken ct) =>
+        service.ClosureReadinessAsync(Actor, organization, incident, ct);
+
+    [HttpPost("closure-risk-reviews")]
+    public Task<ClosureRiskReviewItem> ReviewRisk(Guid organization, Guid incident, ReviewClosureRisk request, CancellationToken ct) =>
+        service.ReviewClosureRiskAsync(Actor, organization, incident, request, ct);
+    [HttpGet("closure-risk-reviews")]
+    public Task<IReadOnlyList<ClosureRiskReviewItem>> RiskHistory(Guid organization, Guid incident, [FromQuery] long afterRevision = 0, [FromQuery] int limit = 50, CancellationToken ct = default) =>
+        service.ClosureRiskHistoryAsync(Actor, organization, incident, afterRevision, limit, ct);
+
     [HttpPut("state")]
     public async Task<IActionResult> Transition(Guid organization, Guid incident, TransitionIncident request, CancellationToken ct) =>
         Ok(await service.TransitionAsync(Actor, organization, incident, request, ct));

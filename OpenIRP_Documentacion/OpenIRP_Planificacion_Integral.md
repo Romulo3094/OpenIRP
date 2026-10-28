@@ -1286,3 +1286,293 @@ Migración 20261026183812_PrivateEvidenceFiles: evidence_files (13 columnas), ev
 - API, contenedores y clústeres propios detenidos; servicios habituales y frontend preservados. Sin commit, push ni merge nuevos.
 
 Continúan RESTRICTED, retención/purga física y conciliación de staging desconocido, revisión de cuarentena/antimalware, omisiones/excepciones y riesgo residual, continuidad por seguridad, cierre integrado e IA supervisada.
+
+
+# 39. Iteración 18 — Omisiones autorizadas
+
+Fecha: 2026-10-26. Se implementa la primera subfase de §9.1 con SKIP_AUTHORIZATION independiente de STEP_APPROVAL.
+El responsable activo solicita con motivo, impacto y riesgo residual. ORG_ADMIN aprueba/rechaza;
+en esta entrega se exige revisión administrativa también para tareas opcionales como alcance conservador.
+
+Las solicitudes quedan ligadas a revisiones de incidente/ejecución e instantánea de dependencias calculada por el servidor.
+Cualquier escritura intermedia exige solicitud actualizada. La autoaprobación requiere excepción explícita justificada.
+Aprobar confirma SKIPPED, historial de autorización/ejecución/incidente y auditoría en la misma transacción.
+La omisión es terminal, no selecciona evidencia ni satisface dependencias; los sucesores siguen bloqueados.
+Cada omisión posterior requiere decisión independiente. Alternativas/excepciones de dependencia quedan pendientes.
+Finalizar una ejecución exige tareas COMPLETED o SKIPPED autorizadas y no resuelve ni cierra el incidente.
+
+Migración 20261026203604_SkipAuthorizations: tabla de 20 columnas, cuatro FK, checks e índices únicos,
+historia append-only y dos nuevos triggers diferidos de integridad. Se conservan los guards de STEP_APPROVAL,
+dependencias y evidencia FILE. Down bloquea pérdida de omisiones/historia; runtime tiene SELECT/INSERT sin edición.
+
+[Guía de Iteración 18: contratos, permisos, archivos y límites](Iteracion18_Omisiones_Autorizadas.md).
+Swagger Development está configurado según [guía local](Swagger_Local.md).
+El avance API de iteraciones 7–17 se publicó en 9cec6a0; los cambios de Swagger e Iteración 18 son locales.
+
+- **38/38 enfocadas** en PostgreSQL 17, incluidas concurrencia, roles, estado, permisos SQL runtime, historial, downgrade protegido, rollback y HTTP/CSRF. Evidencia: artifacts/skip-focused-pg17-5b04e336c13e40a6b8e88fd8d4b0a6e8/paso26-pg17.trx.
+- **678/678 de regresión completa en PostgreSQL 17 y 678/678 en PostgreSQL 18.3**, cero fallidas/omitidas. Las 38 enfocadas son parte de las 678, no pruebas adicionales.
+- TRX completos: artifacts/skip-full-pg17-f9235989e33e4cef92d0a4899da01781/paso26-pg17.trx y artifacts/skip-full-pg18-48cc773d90034ad6a04cf7430d4a3ba4/paso26.trx. Duraciones: 18m13s y 20m39s respectivamente.
+- Release sin errores/advertencias; EF sin diferencias pendientes de modelo.
+- Migración 20261026203604_SkipAuthorizations aplicada únicamente a openirp_dev, propietario openirp, PostgreSQL 17.11 en 127.0.0.1:5433, después de respaldo completo restaurado/verificado en otro contenedor sin puertos publicados y cotejo de conteos/historial. **19 migraciones**; datos previos conservados, ocho capacidades/tres categorías y cero autorizaciones nuevas. Sin cuentas ni ejemplos creados en la base habitual.
+- Evidencia local, SQL incremental, conteos y esquema: artifacts/skip-authorizations-dev-3a89b0ccac274e988e116758c987e029/. Dump openirp_dev-before-skip-authorizations.dump, SHA256 **B1D3F189E5942FA2AD64EE4151B657A5D855B479C9E0BEB4D290D7F62BBF1330**. Incluye el estado anterior a la migración 19. No había FILE registrados; futuros respaldos con archivos reales requieren también el directorio privado.
+- Esquema real verificado: 20 columnas, cuatro FK, cuatro triggers nuevos (dos diferidos), y conservación de controles STEP_APPROVAL/FILE.
+- HTTPS posterior a migración: health/OpenAPI/Swagger 200 y **54 operaciones** del conjunto revisado presentes, anónimos 401. Evidencia: artifacts/skip-authorizations-http-82de0b8db74a487ba13ac4dfd44a4d97/results.json. Es un conjunto comprobado, no el total de endpoints de la API; el flujo autenticado de negocio/CSRF se probó en bases temporales.
+- MCP reindexado; Graphify AST/HTML actualizado localmente (2438 nodos, 6506 relaciones, 184 comunidades), sin extracción semántica ni llamadas externas de IA.
+- Servidores/clústeres propios de pruebas y API temporal detenidos; PostgreSQL/Ollama habituales y frontend preservados. No se hizo commit, push ni merge nuevos; HEAD sigue en 9cec6a075c918ca88bf02fdda6b8ad750c8cf4a3.
+
+Continúan RESTRICTED y políticas operativas de archivos, alternativas de dependencias/suficiencia de capacidades,
+continuidad por bloqueo de seguridad vigente, cierre integrado con riesgo residual e IA supervisada.
+
+
+# 40. Iteración 19 — Cobertura declarada de capacidades
+
+Fecha: 2026-10-26. Se incorpora la comparación de requisitos de la versión de ejecución con la disponibilidad efectiva
+actual del incidente, antes de habilitar alternativas o excepciones de dependencia.
+
+GET capability-readiness evalúa la ejecución completa o una tarea exacta (requisitos de versión más los de su paso).
+Conserva referencias REQUIRED/RECOMMENDED separadas, procedencia, revisiones y notas/limitaciones.
+Unknown explícito conserva su prioridad; catálogo inactivo no se presenta como disponible.
+El resumen distingue NoRequiredCapabilities, DeclaredAvailable, Unknown y Gaps, sin inferir suficiencia técnica.
+
+La lectura usa RepeatableRead, autorización organizacional vigente y consultas en lote. Se admite consulta histórica
+de requisitos fijados a VersionId, mostrando estado de versión/ejecución/tarea y capacidades del snapshot actual.
+No se reconstruye ni se reescribe retrospectivamente la capacidad disponible al completar una tarea.
+
+RequiresHumanReview es siempre true. La consulta no inicia ni completa tareas, no acepta riesgo, no omite controles,
+no satisface dependencias y no cambia severidad. No cambia esquema, migraciones ni permisos SQL.
+La base habitual continúa con las 19 migraciones ya aplicadas. Se alinea OpenAPI con los enums textuales de MVC.
+
+[Guía de Iteración 19: contrato, evaluación, archivos y límites](Iteracion19_Cobertura_Capacidades_Ejecucion.md).
+
+- Release final: cero errores/advertencias; EF sin diferencias pendientes de modelo.
+- Primera comprobación: 37/37 nuevas en PostgreSQL 17. Después se añadieron tres casos de aislamiento/límite/runtime.
+- Selección final de módulos relacionados: **182/182 en PostgreSQL 17 y 182/182 en PostgreSQL 18.3**, cero fallidas/omitidas, incluyendo **40 casos nuevos** (33 integrados y siete del evaluador). Duraciones 7m23s y 7m25s. Cubre cobertura, capacidades de incidente, ejecuciones, STEP_APPROVAL y SKIP_AUTHORIZATION.
+- TRX: artifacts/readiness-relevant-pg17-f89282ee88b24bf38c387f06161512ea/paso26-pg17.trx y artifacts/readiness-relevant-pg18-81e1b877e37e427f962187f3dbba0981/paso26.trx. Las 40 nuevas forman parte de las 182; no se suman.
+- No se repitió la regresión global de 678 casos de Iteración 18: esos resultados siguen documentados como históricos. Esta entrega usa la selección descrita, más las verificaciones HTTPS del ajuste final de esquemas JSON.
+- HTTPS final: health/OpenAPI/Swagger 200; **56 operaciones** del conjunto revisado con anónimos 401. Ambos GET nuevos figuran en OpenAPI y su respuesta es tipada. Enums de cobertura, nivel, disponibilidad y origen contienen valores textuales válidos. Evidencia: artifacts/readiness-http-baed39f398034661942180f29e3ef412/results.json, openapi.json y coverage-enum-schema.json.
+- Development: Swagger/recursos/OpenAPI 200; Production: las mismas rutas 404. Login sin CSRF 400 y organizaciones sin sesión 401 en ambos entornos. Evidencia: artifacts/readiness-swagger-env-b7785337475348d681bbe8b29b99fba2/results.json. Instancias temporales detenidas.
+- El esquema JSON final se comprueba conforme a los valores enum generados (OpenAPI puede omitir type cuando enum ya restringe a cadenas); se conserva la serialización MVC previa.
+- Conteos e IDs de las **19 migraciones locales anteriores idénticos** antes/después: artifacts/readiness-dev-checks-1bfa35949e7146e48e9cdcc95f0d35ed/before-counts.json, after-counts.json y unchanged.txt. No se aplicó ninguna migración, se cargaron ejemplos ni se crearon cuentas en openirp_dev.
+- MCP reindexado (2892 nodos/8320 relaciones); Graphify AST/HTML actualizado localmente (2530 nodos/6751 relaciones/187 comunidades), sin llamadas externas de IA.
+- Servidores/clústeres de prueba y API temporal detenidos; Docker PostgreSQL/Ollama y frontend habituales preservados. Sin commit, push, merge ni cambios remotos nuevos; HEAD permanece 9cec6a075c918ca88bf02fdda6b8ad750c8cf4a3.
+
+Continúan alternativas/excepciones de dependencias, continuidad por bloqueo de seguridad vigente,
+cierre agregado de riesgos, RESTRICTED, controles operativos de archivos e IA supervisada.
+
+
+# 41. Iteración 20 — Excepciones individuales de dependencias
+
+Fecha: 2026-10-26. Primera subfase de excepciones de §9.1: responsable solicita y ORG_ADMIN decide
+sobre una arista cuyo predecesor está SKIPPED con autorización original. Se exige impacto/riesgo,
+revisiones, contexto de incidente/capacidades y excepción explícita de autoaprobación cuando corresponda.
+
+No se cambia el DAG publicado ni se convierte SKIPPED en COMPLETED. Cada dependencia no satisfecha exige
+decisión independiente; predecesores pendientes/en curso no se pueden eludir. Aprobación de paso y evidencia
+siguen siendo controles separados. La excepción no concede suficiencia técnica ni continuidad sobre versión retirada.
+
+La aprobación persiste durante avance ordinario, pero reasignación o cambios de riesgo/capacidades la invalidan.
+La transacción y los guards SQL verifican identidad, contexto, historia y estado final de la tarea.
+No se hace cierre automático ni se reescribe historia completada.
+
+Migración 20261026224629_DependencyExceptions: tabla de 23 columnas, siete FK, historia append-only,
+contexto versionado con valores/revisiones y huellas, cuatro triggers nuevos (dos diferidos) y permisos runtime limitados.
+Down conserva datos/historia; predicado común mantiene todos los controles previos.
+
+[Guía de Iteración 20: API, contexto, archivos y límites](Iteracion20_Excepciones_Dependencias.md).
+
+- Compilación Release final: cero errores y advertencias. EF confirma que no hay diferencias pendientes de modelo.
+- Regresión global inicial: **767/768 en PostgreSQL 17 y 767/768 en PostgreSQL 18.3**, sin omitidas. El único fallo fue SkipHistoryIsAppendOnlyInSqlAndEf(operation: "truncate"): la nueva FK adelantaba el error 0A000 al 42501 esperado. Se corrigió el fixture para truncar ambas tablas relacionadas y comprobar el guard append-only.
+- Verificación final: **54/54 en cada motor**, sin fallidas/omitidas: **51 casos de excepciones** y tres variantes de historial de omisiones. Incluye organización activa en SQL, aislamiento, roles/CSRF, contexto vigente, rollback, concurrencia, múltiples dependencias, aprobación de paso, evidencia y permisos runtime.
+- No se repitió toda la suite después del ajuste. Las ejecuciones global y enfocada acreditan 769 IDs de caso distintos aprobados por motor; no equivalen a una ejecución global final de 769/769. Se usan IDs TRX porque dos nombres de presentación truncados coinciden.
+- TRX globales: [PG17](../artifacts/dependency-full-pg17-9ca443f12ca648b3a9694cf5a98e18c2/paso26-pg17.trx), [PG18.3](../artifacts/dependency-full-pg18-d1527556f5594b429a0d753d27af0929/paso26.trx). TRX finales: [PG17](../artifacts/dependency-final-pg17-9755baca29034b7a838365203bc023dd/paso26-pg17.trx), [PG18.3](../artifacts/dependency-final-pg18-3b4765896f184c8a8e61184cd4aa02c4/paso26.trx).
+- Matrices verificables con hashes: [PG17](../artifacts/dependency-exceptions-dev-66f182a79e0848bf90c3ea7d70cff43b/validation-matrix-pg17.json), [PG18.3](../artifacts/dependency-exceptions-dev-66f182a79e0848bf90c3ea7d70cff43b/validation-matrix-pg18.json).
+- Respaldo completo anterior a la migración 20 restaurado en PostgreSQL aislado, con conteos e historial coincidentes. SHA256: 22232280AE668ADD92F72B5ACE17F5C2A3C3F6E6320866D63EEB28C4255E9921. [Restauración](../artifacts/dependency-exceptions-dev-66f182a79e0848bf90c3ea7d70cff43b/restore-verified.txt).
+- Migración **20261026224629_DependencyExceptions aplicada únicamente a openirp_dev local, 127.0.0.1:5433**. Se conservan los conteos previos: ocho capacidades, tres categorías, identidad/negocio/historiales vacíos; dependency_exceptions tiene cero filas. Historial de 20 migraciones. [Conteos](../artifacts/dependency-exceptions-dev-66f182a79e0848bf90c3ea7d70cff43b/after-counts.json).
+- SQL incremental final revisado; esquema comprobado: 23 columnas, siete FK, cuatro triggers nuevos (dos diferidos). Conserva guards de STEP_APPROVAL, FILE y organización activa. [SQL final](../artifacts/dependency-exceptions-dev-66f182a79e0848bf90c3ea7d70cff43b/DependencyExceptions-final.sql), [comprobación](../artifacts/dependency-exceptions-dev-66f182a79e0848bf90c3ea7d70cff43b/Verify-DependencySchema.sql).
+- HTTPS posterior a la migración: health/OpenAPI/Swagger 200; **59 operaciones del conjunto revisado** responden 401 sin sesión. Las tres rutas nuevas y sus contratos figuran en OpenAPI. No es el total de endpoints; health es estático. [Resultados](../artifacts/dependency-exceptions-http-1c9f40f709924ce48852cbbff564ec8b/results.json).
+- Las pruebas autenticadas utilizaron bases temporales; no se crearon cuentas ni datos de negocio en la base habitual. Docker se reinició al detectarse detenido; PostgreSQL/Ollama habituales vuelven a estar disponibles. API y procesos propios de prueba se cerraron.
+- Grafo MCP reindexado: 3030 nodos/8997 relaciones. Graphify AST/HTML: 2636 nodos/7179 relaciones/193 comunidades, sin IA externa.
+- Sin commit, push, merge ni cambios remotos nuevos; HEAD permanece 9cec6a075c918ca88bf02fdda6b8ad750c8cf4a3.
+
+
+Continúan alternativas verificadas, revocación específica, continuidad por security_hold_id,
+cierre agregado de riesgos, RESTRICTED, controles de archivos e IA supervisada.
+
+
+# 42. Iteración 21 — Vigencia actual de dependencias
+
+GET por tarea muestra predecesores directos, satisfacción actual y metadatos de la última solicitud/decisión.
+Distingue APPROVED histórico de excepción vigente, reutilizando el predicado SQL de las transiciones bajo RepeatableRead.
+La consulta no concede permiso para avanzar ni sustituye aprobación de paso, evidencia o contexto operativo.
+Sin cambios de esquema, migraciones ni grants.
+
+[Guía de Iteración 21](Iteracion21_Vigencia_Dependencias.md).
+
+- Release final con .NET SDK 10.0.403: cero errores y advertencias; EF sin diferencias pendientes de modelo.
+- Selección final de módulos relacionados: **118/118 en PostgreSQL 17 y 118/118 en PostgreSQL 18.3**, sin fallidas/omitidas: **27 casos nuevos** de esta consulta y 91 existentes de excepciones/capacidades. Las 27 están incluidas en las 118; no se suman.
+- Evidencias finales: [TRX PG17](../artifacts/dependency-readiness-pg17-7aa52980a9924adda338c57ed26b1036/paso26-pg17.trx), [TRX PG18.3](../artifacts/dependency-readiness-pg18-920c0ea56fe046c4a5e02f9a9d96b996/paso26.trx); [matriz y hashes](../artifacts/dependency-readiness/validation.json).
+- Cubre estados de predecesores, solicitud/rechazo/aprobación, caducidad, STEP_APPROVAL independiente, múltiples aristas, aislamiento real entre organizaciones/ejecuciones, roles/lockout, HTTP/no-store, cuenta SQL limitada y cambio concurrente de capacidades entre lecturas.
+- La primera ejecución obtuvo 100/118 por motor: 17 fallos por alias PascalCase incompatibles con el mapeo snake_case y uno por precondición de capacidad del fixture. Se corrigieron ambos. La segunda ejecución obtuvo 117/118 por motor: el fixture de rechazo enviaba indicadores de autoaprobación y fue corregido. Después se repitieron los 118 casos completos de la selección, con los resultados finales indicados. Los TRX iniciales se conservan en artifacts/dependency-readiness-pg17-ffba734ba0aa472893c45218544c247a y artifacts/dependency-readiness-pg18-bd9d309883794c5c8f4840a76873a252.
+- No se repitió la regresión global de toda la API; sus resultados históricos y el ajuste de Iteración 20 permanecen documentados por separado.
+- HTTPS final: health/OpenAPI/Swagger 200; **60 operaciones del conjunto revisado** responden 401 sin sesión. El GET nuevo y ExecutionDependencySatisfaction figuran en OpenAPI con enum textual. [Resultados](../artifacts/dependency-readiness-http-ca3b712512ec44eaad3e196932915983/results.json). No representa el total de endpoints y health es estático.
+- Base habitual openirp_dev en 127.0.0.1:5433 sin cambios: los mismos IDs de 20 migraciones, ocho capacidades/tres categorías y conteos de identidad/negocio/historiales vacíos. Ninguna migración nueva ni datos de ejemplo. [Comparación](../artifacts/dependency-readiness/unchanged.txt), [antes](../artifacts/dependency-readiness/dev-before.json), [después](../artifacts/dependency-readiness/dev-after.json).
+- MCP reindexado: 3110 nodos/9242 relaciones. Graphify AST/HTML: 2691 nodos/7363 relaciones/197 comunidades; sin IA externa.
+- Procesos propios temporales de pruebas/HTTPS detenidos al cerrar; PostgreSQL/Ollama habituales preservados. Sin commit, push ni merge nuevos; HEAD sigue en 9cec6a075c918ca88bf02fdda6b8ad750c8cf4a3.
+
+Continúan revocación dedicada, alternativas verificadas, continuidad por security_hold_id vigente, cierre agregado de riesgos, RESTRICTED, operación de archivos e IA supervisada.
+
+
+# 43. Iteración 22 — Revocación de excepciones de dependencia
+
+Fecha de cierre: 2026-10-27. ORG_ADMIN revoca una aprobación concreta con motivo y revisiones vigentes.
+Conserva la decisión original y registra revocación append-only separada. Si la tarea está en curso,
+queda BLOCKED en la misma transacción, incluso si su responsable ya no es elegible. No se reescriben tareas
+ni ejecuciones terminadas ni se habilita continuidad de versiones retiradas.
+
+El predicado compartido excluye esa aprobación; otras aristas y nuevas aprobaciones conservan su alcance propio.
+GET dependency-readiness incorpora la referencia de revocación, separada de APPROVED histórico.
+
+[Guía de Iteración 22](Iteracion22_Revocacion_Excepciones.md).
+
+- Release final con SDK .NET 10.0.403: cero errores/advertencias; EF sin diferencias de modelo pendientes.
+- Primera comprobación enfocada: **38/38 en PostgreSQL 17**, incluidas carreras con ambos escritores esperando en pg_locks.
+- Selección final ampliada: **280/280 en PostgreSQL 17 y 280/280 en PostgreSQL 18.3**, sin fallidas/omitidas. Incluye **43 casos nuevos** de revocación y 237 existentes: ejecuciones, STEP_APPROVAL, omisiones, excepciones, cobertura/vigencia y protección de definiciones/fixtures TRUNCATE.
+- Las 43 están incluidas en las 280. No se repitió la suite global de toda la API. [TRX PG17](../artifacts/revocation-related-pg17-2a3f8b3c43a2477b8a0942ba0b897936/paso26-pg17.trx), [TRX PG18.3](../artifacts/revocation-related-pg18-c358fb522f014cc796a44f3683e8104e/paso26.trx), [matriz y hashes](../artifacts/dependency-revocations/validation.json).
+- Cubre motivo/revisiones/CSRF, roles y cuentas actuales, organizaciones distintas, revocación de autorización caducada, responsable deshabilitado, aristas independientes, reautorización nueva, bloqueo atómico, rollback de ambas revisiones/estado/historiales, doble revocación y carrera contra completar, SQL sin eventos, append-only EF/SQL, cuenta runtime y downgrade protegido.
+- Respaldo completo anterior a la migración 21 restaurado en PostgreSQL aislado sin puertos publicados, con conteos e historial idénticos. Dump: artifacts/dependency-revocations/openirp_dev-before-dependency-revocations.dump. SHA256: **37CF59FDCDC0F306291E8683DF7FB89A6453447D6CB94D0B398126A8221984BF**. [Restauración](../artifacts/dependency-revocations/restore-verified.txt).
+- Migración **20261027024554_DependencyExceptionRevocations aplicada únicamente a openirp_dev local, 127.0.0.1:5433, propietario openirp**. Se comprobaron destino, conteos actuales y hash del respaldo antes de aplicar. **21 migraciones**; conteos previos conservados, ocho capacidades/tres categorías e identidad/negocio/historiales vacíos. Tabla nueva sin filas. [Conteos](../artifacts/dependency-revocations/after-counts.json).
+- SQL incremental revisado; esquema real: 18 columnas, dos FK (una compuesta de diez campos), tres triggers nuevos, uno diferido. Predicado previo preservado salvo exclusión por ID de aprobación revocada; guards anteriores de tarea/STEP_APPROVAL/FILE conservados. [SQL](../artifacts/dependency-revocations/DependencyExceptionRevocations.sql), [comprobación](../artifacts/dependency-revocations/Verify-Schema.sql), [resultado](../artifacts/dependency-revocations/schema-verified.txt).
+- HTTPS posterior a migración: health/OpenAPI/Swagger 200; **62 operaciones del conjunto revisado** responden 401 sin sesión. GET/POST de revocación figuran con contratos tipados. [Resultados](../artifacts/revocation-http-25d3cea699e542e4862424f6f7a35978/results.json). No es el total de endpoints; health es estático. Los flujos autenticados se probaron en bases temporales, sin fabricar cuentas ni datos en la base habitual.
+- MCP actualizado: 3211 nodos/9669 relaciones. Graphify AST/HTML: 2768 nodos/7644 relaciones/202 comunidades, sin IA externa.
+- Servidores propios de pruebas/restauración y API temporal detenidos; PostgreSQL/Ollama habituales y frontend preservados. Sin commit, push ni merge nuevos; HEAD continúa en 9cec6a075c918ca88bf02fdda6b8ad750c8cf4a3.
+
+Continúan alternativas verificadas, continuidad por el security_hold_id vigente, cierre agregado de riesgos, RESTRICTED, operación de archivos e IA supervisada.
+
+
+# 44. Iteración 23 — Bloqueo de seguridad y continuidad
+
+Fecha: 2026-10-27. Retirada explícita de seguridad con identificador nuevo por aviso. La versión queda ARCHIVED
+y sus ejecuciones se bloquean operativamente hasta una decisión ORG_ADMIN de su propio ámbito, referida al ID vigente.
+CONTINUE conserva todos los controles ordinarios; CANCEL conserva tareas/historia y no resuelve el incidente.
+Un aviso posterior invalida autorizaciones anteriores sin reescribir tareas ni otorgar permisos globales.
+
+[Guía de Iteración 23](Iteracion23_Bloqueo_Seguridad_Continuidad.md).
+
+- Release final con SDK .NET 10.0.403: cero errores/advertencias; EF sin diferencias pendientes de modelo.
+- Primera selección enfocada completada: **17/17 en PostgreSQL 17**. Dos intentos anteriores de aplicar la migración temporal detectaron terminadores SQL y una expresión CASE, corregidos antes de completar esta selección; no afectaron la base habitual.
+- Selección final de módulos relacionados: **312/312 en PostgreSQL 17 y 312/312 en PostgreSQL 18.3**, sin fallidas/omitidas: **32 casos nuevos** de seguridad y 280 existentes. Las 32 están incluidas en las 312. No se repitió la suite global de toda la API.
+- [TRX PG17](../artifacts/security-related-pg17-cff5ff6c18264118aec6ba427f65efdb/paso26-pg17.trx), [TRX PG18.3](../artifacts/security-related-pg18-00b62d5d82774e10ad035991f44a692b/paso26.trx), [matriz y hashes](../artifacts/security-holds/validation.json).
+- Cubre retirada pública/privada, bloqueo actual, continuidad y cancelación posterior, nueva retirada que invalida decisión antigua, roles/CSRF, scopes, revisión optimista, historia EF/SQL/TRUNCATE, rollback de fuente/ejecución/historiales, carreras forzadas, SQL sin eventos, runtime limitado, snapshots concurrentes y migración reversible en vacío/protegida con historia. STEP_APPROVAL/evidencia permanecen obligatorios tras autorizar continuidad.
+- El primer lanzador nativo de PostgreSQL 18 se quedó detenido antes de las pruebas bajo redirección de salida. Se detuvieron solo el PowerShell y clúster propios identificados; se reinició sin esa redirección. La ejecución final es la del TRX enlazado. El servicio PostgreSQL de Windows no se detuvo.
+- Respaldo anterior a migración 22 restaurado en PostgreSQL aislado, conteos e historial coincidentes. Dump artifacts/security-holds/openirp_dev-before-security-holds.dump; SHA256 **6FF919DC56211F8ABA78B72CA49C39C2358EE4251F62A27578D34635F807AF21**. [Restauración](../artifacts/security-holds/restore-verified.txt).
+- Migración **20261027031839_ExecutionSecurityHolds** aplicada solo a openirp_dev local en 127.0.0.1:5433, propietario openirp, tras comprobar respaldo, conteos y hashes de las siete funciones previas. **22 migraciones**, datos anteriores conservados: ocho capacidades/tres categorías, identidad/negocio/historiales vacíos y ambas tablas nuevas vacías. [Conteos](../artifacts/security-holds/after-counts.json).
+- Esquema real comprobado: 8+13 columnas, seis FK y siete triggers nuevos (tres diferidos); controles anteriores de aprobación/FILE/revocación conservados. [SQL final](../artifacts/security-holds/ExecutionSecurityHolds-final.sql), [verificador](../artifacts/security-holds/Verify-Schema.sql), [resultado](../artifacts/security-holds/schema-verified.txt).
+- HTTPS posterior a migración: health/OpenAPI/Swagger 200 y **67 operaciones revisadas** con anónimos 401. Los cinco endpoints nuevos tienen contratos tipados. [Resultados](../artifacts/security-http-74e8f27e21c54091a9b36241af0a0c56/results.json). No es el total de endpoints; health es estático. Las operaciones autenticadas de negocio se probaron en bases temporales.
+- MCP actualizado: 3369 nodos/10117 relaciones. Graphify AST/HTML: 2884 nodos/8002 relaciones/209 comunidades, sin IA externa.
+- Procesos propios temporales de pruebas/restauración/HTTPS cerrados; PostgreSQL/Ollama habituales, frontend y trabajo previo preservados. Sin commit, push ni merge; HEAD sigue en 9cec6a075c918ca88bf02fdda6b8ad750c8cf4a3.
+
+Continúan política de propagación a clones/derivadas, alternativas verificadas, integración agregada del cierre, RESTRICTED, operación de archivos e IA supervisada.
+
+
+## 45. Iteración 24 — Consulta de preparación para el cierre (2026-10-27)
+
+[Guía de preparación para el cierre](Iteracion24_Preparacion_Cierre.md).
+
+Consulta informativa y consistente del incidente: controles actuales de cierre, permisos del lector, revisión por máximo histórico, agregados de ejecuciones/tareas/evidencias, FILE no disponibles, historia de excepciones/revocaciones y bloqueo vigente de la ejecución activa. No implementa aún aceptación de riesgos residuales ni suficiencia técnica; conserva las reglas de escritura actuales.
+
+
+- Release .NET SDK 10.0.403: cero errores y advertencias. EF no detecta diferencias pendientes de modelo.
+- **146/146 en PostgreSQL 17 y 146/146 en PostgreSQL 18.3**, sin fallidas/omitidas: **24 casos nuevos** y 122 existentes de ciclo de vida, ejecuciones y bloqueos de seguridad. Las 24 están incluidas en las 146. No se ejecutó la suite global completa de la API.
+- Cubre clasificación pendiente, máximo histórico, cierre directo/revisión, autoaprobación, invalidación, responsables y cuentas actuales, roles/aislamiento, agregados de tareas/evidencias, FILE fallidos, historia/revocación de excepciones, bloqueo vigente, runtime SQL limitado, HTTP/no-store y cancelación concurrente con instantánea consistente.
+- Primera selección: 126/146 por motor, con 20 fallos por ordenar después de construir el DTO de agregación. Se movió el orden antes de la proyección SQL y se repitieron las 146 completas de cada motor. Los TRX iniciales permanecen en artifacts/closure-related-pg17-5503a8895167446e895cbe375602aa4e y artifacts/closure-related-pg18-5b7111f589fe4486bfafb1acfd84655d.
+- [TRX PG17](../artifacts/closure-related-pg17-ecee0469546a46309dbb9b365df4aae7/paso26-pg17.trx), [TRX PG18.3](../artifacts/closure-related-pg18-6db491e5a5c746cf9f83c30a1b297b46/paso26.trx), [matriz con hashes](../artifacts/closure-readiness/validation.json).
+- HTTPS Development: health/OpenAPI/Swagger 200; nuevo GET devuelve 401 anónimo y tiene contrato IncidentClosureReadiness tipado. HTTP autenticado y no-store probados en bases temporales. Health es estático; no acredita conectividad a servicios. [Resultados](../artifacts/closure-http-969b607caf2b40718dfc3ef38eaeb985/results.json), [OpenAPI](../artifacts/closure-http-969b607caf2b40718dfc3ef38eaeb985/openapi.json).
+- Base habitual openirp_dev en 127.0.0.1:5433: mismos conteos de tablas app/auth y mismos 22 IDs de migración antes/después. Ocho capacidades, tres categorías, sin usuarios ni incidentes. No se aplicaron migraciones ni operaciones de negocio. [Comparación](../artifacts/closure-readiness/dev-unchanged.txt), [antes](../artifacts/closure-readiness/dev-before.json), [después](../artifacts/closure-readiness/dev-after.json). No fue necesario un respaldo nuevo: esta iteración no escribe datos ni cambia esquema en la base habitual; el respaldo restaurado de Iteración 23 sigue documentado.
+
+
+## 46. Iteración 25 — Contexto exacto de revisión de cierre (2026-10-27)
+
+[Guía de contexto de cierre](Iteracion25_Contexto_Revision_Cierre.md).
+
+El usuario confirmó que TODOS los cierres exigirán evaluación vigente de ORG_ADMIN. Esta política queda aprobada y pendiente de implementar en la siguiente subfase: esta entrega proporciona closureContextToken y su comprobación opcional como precondición de concurrencia, conservando compatibilidad. No equivale a evaluación o aceptación de riesgo residual. Identifica cambios externos a la revisión del incidente y conserva el token validado en el evento confirmado.
+
+
+- .NET SDK 10.0.403, compilación Release sin errores ni advertencias. EF sin cambios pendientes de modelo.
+- Selección enfocada inicial: **23/23 en PostgreSQL 17**. [TRX enfocado](../artifacts/closure-context-focused-pg17-4aff12a9793e4717bcb1fa7cf0203a84/paso26-pg17.trx).
+- Regresión final relacionada: **169/169 en PostgreSQL 17 y 169/169 en PostgreSQL 18.3**, cero fallidas/omitidas: 23 nuevas incluidas y 146 existentes de preparación/ciclo de vida/cierre, ejecuciones y bloqueos de seguridad. No es la suite global completa de la API.
+- [TRX PG17](../artifacts/closure-context-related-pg17-f27581c2e2004d55ab7079ead86c7800/paso26-pg17.trx), [TRX PG18.3](../artifacts/closure-context-related-pg18-6e0579bb13ea4e1387c82bb748208fe1/paso26.trx), [matriz con hashes](../artifacts/closure-context/validation.json).
+- Casos nuevos: estabilidad entre lectores, formato, ámbito, ausencia de permiso implícito, escritura con token confirmado en historial; retirada antes de cierre/solicitud/aprobación/rechazo con revisión de incidente intacta; recuperación FILE; alertas posteriores a ejecución terminal; perfiles/catálogos/membresías/categoría; incidentes y organizaciones ajenas; instantánea concurrente y carreras reales con ambos escritores esperando el gate en pg_locks. Las pruebas existentes incluyen lecturas bajo cuenta SQL limitada y revalidación de cuentas/roles.
+- HTTPS Development: health/OpenAPI/Swagger 200, GET anónimo 401; contrato de respuesta incluye closureContextToken y los tres contratos de escritura exponen expectedClosureContext opcional. HTTP autenticado y CSRF se prueban en bases temporales. Health es estático. [Resultados](../artifacts/closure-context-http-7ec630e3294940e7931d03f78ff1e6c6/results.json), [OpenAPI](../artifacts/closure-context-http-7ec630e3294940e7931d03f78ff1e6c6/openapi.json).
+- openirp_dev en 127.0.0.1:5433 conserva todos los conteos de tablas app/auth/audit y los 22 IDs de migración. Ocho capacidades, tres categorías, sin usuarios ni incidentes. No se ejecutaron migraciones ni operaciones de negocio en ella. No se generó respaldo nuevo para esta entrega sin escrituras; el respaldo restaurado de Iteración 23 sigue documentado. [Antes](../artifacts/closure-context/dev-before.json), [después](../artifacts/closure-context/dev-after.json), [comparación](../artifacts/closure-context/dev-unchanged.txt).
+- Grafos actualizados: MCP 3486 nodos/10504 relaciones; Graphify AST/HTML 2990 nodos/8359 relaciones/218 comunidades, sin IA externa.
+- Procesos propios temporales de pruebas y API detenidos; servicios habituales preservados. Sin commit, push, merge ni cambios remotos. HEAD se conserva en 9cec6a075c918ca88bf02fdda6b8ad750c8cf4a3.
+
+
+## 47. Iteración 26 — Evaluación y aceptación de riesgo en todos los cierres (2026-10-27)
+
+[Guía de evaluación de riesgo y cierre](Iteracion26_Evaluacion_Riesgo_Cierre.md).
+
+Implementa la decisión del usuario: todos los cierres requieren evaluación vigente y aceptación explícita de ORG_ADMIN. Historial append-only, precondición por contexto, rechazo que supersede aceptación antigua, declaración propia explícita y guards SQL. La huella semántica no caduca por solicitar aprobación; cambios relevantes sí exigen evaluación nueva. HIGH/CRITICAL conserva su decisión adicional de cierre. Los cierres anteriores permanecen históricos; reapertura exige la política nueva.
+
+
+- Compilación Release, SDK .NET 10.0.403: cero errores y advertencias. EF sin diferencias pendientes de modelo.
+- Selección enfocada inicial: **34/34 en PostgreSQL 17**. [TRX](../artifacts/closure-risk-focused-pg17-1f6469af392b41c09880a64de19d7f04/paso26-pg17.trx).
+- Primera selección ampliada: **281/284 en PostgreSQL 17**. Se corrigieron un fixture que comparaba precisión temporal en memoria con la de PostgreSQL y dos escenarios antiguos que no preparaban la aceptación exigida por la política nueva. [TRX inicial](../artifacts/closure-risk-related-pg17-247d9124852f4c86ac5aab059f7433c5/paso26-pg17.trx).
+- Suite global: **957/958 en PostgreSQL 17 y 957/958 en PostgreSQL 18.3**, sin omitidas. Único fallo: RestrictedRuntimeCanWriteBusinessAndAppendAuditButCannotMutateHistory, cuyo escenario antiguo cerraba sin evaluación. Se actualizó para registrar la evaluación usando la MISMA cuenta SQL limitada y comprobar el incremento adicional de revisión/auditoría. [Global PG17](../artifacts/closure-risk-full-pg17-810ddd47927244c091d54318d8112df6/paso26-pg17.trx), [global PG18.3](../artifacts/closure-risk-full-pg18-3dc7b88452ca40859db92b838602bf9d/paso26.trx).
+- Verificación final después de esa corrección: **285/285 en PostgreSQL 17 y 285/285 en PostgreSQL 18.3**, cero fallidas/omitidas. Incluye las **40 pruebas nuevas**, los módulos relacionados y el caso de cuenta limitada corregido. Las 40 están incluidas en las 285.
+- [Final PG17](../artifacts/closure-risk-final-pg17-4f3c50021c504c83ab77d02696345cee/paso26-pg17.trx), [final PG18.3](../artifacts/closure-risk-final-pg18-6a07a226768a43249fec6ba1e93db109/paso26.trx), [matriz y hashes](../artifacts/closure-risk/validation.json).
+- No se repitió la suite global completa después del último ajuste de fixture. Las DLL de negocio permanecen byte a byte idénticas a las de las ejecuciones globales. La unión por IDs TRX acredita **958 casos distintos aprobados por motor**, combinando global y final; NO equivale a una ejecución global final de 958/958. [Cobertura PG17](../artifacts/closure-risk/coverage-PG17.json), [cobertura PG18.3](../artifacts/closure-risk/coverage-PG18-3.json), [hashes de negocio](../artifacts/closure-risk/global-business-assemblies.json).
+- Cubre aceptación/rechazo y supersesión, vigencia a través de solicitud/aprobación, cambios de contexto sin cambio de revisión, reapertura, cierres anteriores, rol/cuenta/ámbito, declaración propia, validación/CSRF, historial EF/SQL/TRUNCATE, rollback de todos los agregados, SQL sin aceptación/eventos y carreras reales. La cuenta runtime puede registrar evaluación y cerrar, con la misma huella de riesgo bajo timezone distinto, sin mutar historia.
+- Respaldo completo anterior a migración 23 restaurado en PostgreSQL 17 aislado, sin puertos publicados. Coinciden todos los conteos app/auth/audit, los 22 IDs de migración previos y las definiciones de funciones. SHA256: **009041B427E5A3564E12F5C3D31838C328762F19D1A6A5A5BA3A17546DB2FA20**. [Restauración](../artifacts/closure-risk/restore-verified.txt), [respaldo y hash](../artifacts/closure-risk/backup-sha256.json).
+- Migración **20261027145849_ClosureRiskReviews** aplicada únicamente a openirp_dev local, **127.0.0.1:5433**, propietario openirp, tras comprobar contexto Docker local, destino, respaldo, matriz y ausencia de cambios desde el respaldo. **23 migraciones**; ocho capacidades/tres categorías y conteos previos conservados. closure_risk_reviews tiene cero filas. No se crearon usuarios ni datos de negocio en la base habitual.
+- Todas las funciones app/auth previas conservan sus definiciones. Esquema real: 13 columnas, dos FK y cinco triggers nuevos (dos diferidos), con seis funciones. [SQL incremental](../artifacts/closure-risk/ClosureRiskReviews.sql), [verificador](../artifacts/closure-risk/Verify-Schema.sql), [resultado](../artifacts/closure-risk/schema-verified.txt), [conservación](../artifacts/closure-risk/dev-preserved.txt), [antes](../artifacts/closure-risk/dev-before.json), [después](../artifacts/closure-risk/dev-after.json).
+- HTTPS posterior: health/OpenAPI/Swagger 200; GET closure-readiness y GET/POST closure-risk-reviews responden 401 anónimos. Contratos tipados y decisiones/revisión/contexto obligatorios presentes en OpenAPI. No es el total de endpoints; health es estático. Los flujos autenticados se verificaron en bases temporales. [Resultados](../artifacts/closure-risk-http-ce7d972b22a646f6a7f7993b5a2b5bdc/results.json), [OpenAPI](../artifacts/closure-risk-http-ce7d972b22a646f6a7f7993b5a2b5bdc/openapi.json).
+- MCP actualizado: 3596 nodos/11295 relaciones. Graphify AST/HTML: 3074 nodos/8666 relaciones/231 comunidades, sin IA externa.
+- Sin commit, push, merge ni mutaciones remotas. HEAD permanece 9cec6a075c918ca88bf02fdda6b8ad750c8cf4a3. Se preservaron frontend y cambios previos.
+
+
+## 48. Iteración 27 — Soporte de evidencias por ejecución (2026-10-27)
+
+[Contrato, límites y verificaciones](Iteracion27_Soporte_Evidencias_Ejecucion.md).
+
+GET `.../incidents/{incident}/executions/{execution}/evidence-readiness` detalla el soporte actual de la evidencia seleccionada por cada tarea exacta, referencias retiradas, metadatos FILE no disponibles, omisiones y trabajo pendiente. Lectura RepeatableRead con RiskContextToken del mismo snapshot y lote acotado de hasta cien tareas. No devuelve contenido privado ni abre archivos; FileIntegrityVerified=false, TechnicalSufficiencyVerified=false y RequiresHumanReview=true. No cambia tareas, autorizaciones ni la política de aceptación ORG_ADMIN de todos los cierres.
+
+- Release: cero errores/advertencias, EF sin diferencias pendientes.
+- Enfocadas: **31/31 PostgreSQL 17**. Regresión relacionada final: **187/187 PostgreSQL 17.11 y 187/187 PostgreSQL 18.3**, sin fallidas/omitidas; las 31 nuevas están incluidas. No se repitió la suite global completa. [PG17](../artifacts/evidence-readiness-related-pg17-5a7b15e314974346ac0fe524b66a88c9/paso26-pg17.trx), [PG18.3](../artifacts/evidence-readiness-related-pg18-b537067f85b44f6d8a881ac4b3e696e2/paso26.trx), [matriz y hashes](../artifacts/evidence-readiness/validation.json).
+- Cubre aislamiento, roles/cuentas y SQL limitado, exactitud del vínculo, retirada/cuarentena, lectura terminal, casos históricos inválidos en bases desechables, cien tareas sin truncar, privacidad del lote y retirada concurrente con contexto coherente.
+- Base habitual local: **23 migraciones sin cambios**, conteos de todas las tablas app/auth/audit y funciones app/auth idénticos al inicio. Sin migración ni datos de negocio nuevos. [Conservación](../artifacts/evidence-readiness/dev-unchanged.txt), [antes](../artifacts/evidence-readiness/dev-before.json), [después](../artifacts/evidence-readiness/dev-after.json).
+- HTTPS: health/OpenAPI/Swagger 200 y nuevo GET 401 anónimo; contrato tipado y enums string verificados. No es una prueba de todos los endpoints. [Resultados](../artifacts/evidence-readiness-http-99b462422a464c3e987e26137517e519/results.json).
+- MCP: 3684 nodos/11626 relaciones; Graphify AST/HTML: 3134 nodos/8895 relaciones/223 comunidades, sin IA externa.
+- Quedan suficiencia técnica y alternativas verificadas, propagación a derivadas, RESTRICTED, políticas operativas de archivos, IA supervisada, RLS y validación integral del MVP.
+- Procesos propios temporales detenidos y servicios habituales conservados. Sin commit/push/merge; HEAD 9cec6a075c918ca88bf02fdda6b8ad750c8cf4a3. Cambios previos y frontend preservados.
+
+
+## 49. Tramo previo a IA — Iteraciones 28–32 (2026-10-27)
+
+El usuario autorizó continuar el desarrollo hasta antes de la integración de IA local. [Estado integrado y verificaciones](Entrega_PreIA_Iteraciones28_32.md). Implementación y validación completadas. Base habitual actualizada a 26 migraciones tras respaldo restaurado y ensayo de actualización, con todos los conteos e historial previos conservados.
+
+- [28 — Revisión técnica de evidencias](Iteracion28_Revision_Tecnica_Evidencias.md): decisión humana explícita con método/soporte/contexto, historial inmutable y atomicidad con evento/auditoría.
+- [29 — Alternativas operativas validadas](Iteracion29_Alternativas_Operativas_Validadas.md): procedimiento y verificación humana por tarea; no equivale a completar un predecesor ni sustituye excepción por arista.
+- [30 — Avisos en derivadas](Iteracion30_Propagacion_Avisos_Seguridad.md): procedencia transitiva, aviso genérico, bloqueo y decisión local independiente; sin copiar contenidos ni conceder permisos en otras organizaciones.
+- [31 — RESTRICTED](Iteracion31_Evidencias_RESTRICTED.md): acceso exclusivo ORG_ADMIN local confirmado por el usuario; TEXT/REFERENCE/FILE y controles de selección al completar.
+- [32 — Operación de archivos sin purga](Iteracion32_Diagnostico_Archivos_Privados.md): verificación administrativa auditable y diagnóstico offline acotado; conservación sin borrado automático confirmada por el usuario.
+
+Todos los cierres mantienen la aceptación de riesgo de Iteración 26 y HIGH/CRITICAL su aprobación adicional. La validación técnica es humana y no crea una certificación global ni un requisito universal nuevo de cierre. IA supervisada y propuestas quedan para la siguiente etapa; RLS, despliegue/separación operativa, antimalware real y plazos de retención siguen como límites y pendientes posteriores.
+
+Verificación final del tramo: Release cero errores/advertencias, EF sin diferencias pendientes; selección final **42/42 en PostgreSQL 17.11 y 18.3**, incluidos **35 casos nuevos**. Global inicial **1017/1019 por motor** con dos fixtures corregidos; negocio byte a byte idéntico. Unión por IDs TRX: **1023 casos distintos aprobados por motor**, sin ejecución global final de 1023/1023. [Matriz](../artifacts/pre-ai/validation.json), [conservación local](../artifacts/pre-ai/dev-preserved.txt). HTTPS y diagnóstico sin purga verificados. MCP 3880 nodos/12119 relaciones; Graphify AST/HTML 3277 nodos/9291 relaciones/247 comunidades, sin IA externa. Sin commit/push/merge ni cambios funcionales de IA/frontend; HEAD 9cec6a075c918ca88bf02fdda6b8ad750c8cf4a3.
+
+
+## 50. Iteración 33 — EXPLAIN_STEP local sin thinking (2026-10-27)
+
+[Contrato, activación, límites y evidencias](Iteracion33_Asistencia_Local_Explicacion_Pasos.md). Primera asistencia local: contexto mínimo autorizado de una tarea, JSON con esquema acotado, revalidación de ámbito/permisos/revisiones/contexto después de inferir y evaluaciones append-only con auditoría atómica. No ejecuta acciones ni modifica tareas, flags, DAG o cierres.
+
+Política del usuario: **solo qwen3:4b-instruct, think=false y /no_think**, sin fallback a qwen3:4b; se descartan thinking/reasoning_content y bloques de pensamiento. La etiqueta instalada declara capacidad thinking; el modo se desactiva explícitamente y no se confía solo en su nombre. Una inferencia por proceso sin cola, límites de bytes/tokens, timeout/cancelación y fallo seguro que conserva el flujo manual. Disabled por defecto, activación local explícita.
+
+El contexto lógico JSON se almacena como TEXT validado con comprobación JSON y SHA-256 para reproducir exactamente sus bytes UTF-8, en vez de canonizar JSONB. Se conservan metadata y campos normalizados válidos; no envelope, original message.content ni reasoning. ai_response_payloads/retención cifrada siguen deshabilitados hasta acordar políticas. VALID no es aceptación humana ni certificación técnica.
+
+- Final relacionado: **259/259 PostgreSQL 17.11 y 259/259 PostgreSQL 18.3**, sin fallidas/omitidas, incluidos **55 casos nuevos**. No se ejecutó suite global completa nueva. Prueba real sintética **1/1**, última duración **2506 ms**; medición puntual sin garantía de latencia. [Matriz y hashes](../artifacts/ai-assistance/validation.json).
+- Release cero errores/advertencias, EF sin diferencias pendientes. HTTPS posterior health/OpenAPI/Swagger 200 y nuevas rutas 401 anónimas; flujos autenticados verificados en bases temporales.
+- Respaldo completo de 26 migraciones restaurado y ensayado a 27; aplicación posterior solo en openirp_dev local 127.0.0.1:5433, con datos, IDs y todas las funciones anteriores intactos. Nueva tabla vacía habitual; no se crearon usuarios o datos de negocio. [Conservación](../artifacts/ai-assistance/dev-preserved.txt).
+- MCP 4132 nodos/12706 relaciones; Graphify AST/HTML 3460 nodos/9743 relaciones/262 comunidades, sin IA externa.
+- Próximo: decisión humana definitiva de IA, otros tipos de asistencia y propuestas supervisadas a borradores. No se habilitan originales persistentes sin política de claves/plazos/respaldos. RLS, separación operativa y validación empírica siguen pendientes.
+- Sin commit/push/merge ni cambios de frontend. HEAD conservado; procesos temporales propios cerrados y servicios habituales preservados.

@@ -27,6 +27,15 @@ public sealed record ExecutionEventItem(Guid Id, long Revision, long IncidentRev
     string Reason, DateTimeOffset OccurredAt);
 public interface IExecutionService
 {
+    Task<OperationalReviewItem> ReviewOperationAsync(Guid actor, Guid organization, Guid incident, Guid execution, Guid task, RegisterOperationalReview request, CancellationToken ct = default);
+    Task<OperationalReviewPage> OperationalReviewsAsync(Guid actor, Guid organization, Guid incident, Guid execution, long afterRevision = 0, int limit = 50, CancellationToken ct = default);
+    Task<ExecutionEvidenceReadiness> EvidenceReadinessAsync(Guid actor, Guid organization, Guid incident, Guid execution, CancellationToken ct = default);
+    Task<IReadOnlyList<SecurityDecisionItem>> SecurityDecisionsAsync(Guid actor, Guid organization, Guid incident, Guid execution, long afterRevision = 0, int limit = 50, CancellationToken ct = default);
+    Task<ExecutionSecurityState> SecurityStateAsync(Guid actor, Guid organization, Guid incident, Guid execution, CancellationToken ct = default);
+    Task<ExecutionItem> DecideSecurityHoldAsync(Guid actor, Guid organization, Guid incident, Guid execution, Guid securityHold, DecideSecurityHold request, CancellationToken ct = default);
+    Task<ExecutionItem> RevokeDependencyExceptionAsync(Guid actor, Guid organization, Guid incident, Guid execution, Guid task, Guid predecessor, Guid exceptionApproval, ExecutionCommand request, CancellationToken ct = default);
+    Task<DependencyRevocationItem> DependencyRevocationAsync(Guid actor, Guid organization, Guid incident, Guid execution, Guid task, Guid predecessor, Guid exceptionApproval, CancellationToken ct = default);
+    Task<TaskDependencyReadiness> DependencyReadinessAsync(Guid actor, Guid organization, Guid incident, Guid execution, Guid task, CancellationToken ct = default);
     Task<ExecutionItem> RequestApprovalAsync(Guid actor, Guid organization, Guid incident, Guid execution, Guid task, ExecutionCommand request, CancellationToken ct = default);
     Task<ExecutionItem> DecideApprovalAsync(Guid actor, Guid organization, Guid incident, Guid execution, Guid task, Guid approvalRequest, DecideStepApproval request, CancellationToken ct = default);
     Task<IReadOnlyList<StepApprovalItem>> ApprovalsAsync(Guid actor, Guid organization, Guid incident, Guid execution, Guid task, long afterRevision = 0, int limit = 50, CancellationToken ct = default);
@@ -38,4 +47,11 @@ public interface IExecutionService
     Task<ExecutionItem> ChangeAsync(Guid actor, Guid organization, Guid incident, Guid execution, Guid task, ChangeExecutionTask request, CancellationToken ct = default);
     Task<ExecutionItem> CompleteAsync(Guid actor, Guid organization, Guid incident, Guid execution, ExecutionCommand request, CancellationToken ct = default);
     Task<ExecutionItem> CancelAsync(Guid actor, Guid organization, Guid incident, Guid execution, ExecutionCommand request, CancellationToken ct = default);
+    Task<ExecutionItem> RequestSkipAsync(Guid actor, Guid organization, Guid incident, Guid execution, Guid task, RequestSkipAuthorization request, CancellationToken ct = default);
+    Task<ExecutionItem> DecideSkipAsync(Guid actor, Guid organization, Guid incident, Guid execution, Guid task, Guid authorizationRequest, DecideSkipAuthorization request, CancellationToken ct = default);
+    Task<IReadOnlyList<SkipAuthorizationItem>> SkipAuthorizationsAsync(Guid actor, Guid organization, Guid incident, Guid execution, Guid task, long afterRevision = 0, int limit = 50, CancellationToken ct = default);
+    Task<ExecutionCapabilityReadiness> CapabilityReadinessAsync(Guid actor, Guid organization, Guid incident, Guid execution, Guid? task = null, CancellationToken ct = default);
+    Task<ExecutionItem> RequestDependencyExceptionAsync(Guid actor, Guid organization, Guid incident, Guid execution, Guid task, Guid predecessor, RequestDependencyException request, CancellationToken ct = default);
+    Task<ExecutionItem> DecideDependencyExceptionAsync(Guid actor, Guid organization, Guid incident, Guid execution, Guid task, Guid predecessor, Guid exceptionRequest, DecideDependencyException request, CancellationToken ct = default);
+    Task<IReadOnlyList<DependencyExceptionItem>> DependencyExceptionsAsync(Guid actor, Guid organization, Guid incident, Guid execution, Guid task, Guid predecessor, long afterRevision = 0, int limit = 50, CancellationToken ct = default);
 }

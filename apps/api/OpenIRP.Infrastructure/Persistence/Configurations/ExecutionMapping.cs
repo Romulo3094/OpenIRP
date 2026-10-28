@@ -31,7 +31,7 @@ internal static class ExecutionMapping
         {
             b.ToTable("execution_tasks", "app", t =>
             {
-                t.HasCheckConstraint("ck_execution_task_status", "status IN ('PENDING','IN_PROGRESS','BLOCKED','COMPLETED')");
+                t.HasCheckConstraint("ck_execution_task_status", "status IN ('PENDING','IN_PROGRESS','BLOCKED','COMPLETED','SKIPPED')");
                 t.HasCheckConstraint("ck_execution_task_revision", "changed_at_revision > 0");
             });
             b.HasKey(e => e.Id); b.Property(e => e.Id).ValueGeneratedNever();
@@ -49,9 +49,9 @@ internal static class ExecutionMapping
         {
             b.ToTable("execution_task_events", "app", t =>
             {
-                t.HasCheckConstraint("ck_execution_event_action", "action IN ('EXECUTION_STARTED','EXECUTION_TASK_ASSIGNED','EXECUTION_TASK_CHANGED','STEP_APPROVAL_REQUESTED','STEP_APPROVAL_APPROVED','STEP_APPROVAL_REJECTED','EXECUTION_COMPLETED','EXECUTION_CANCELLED')");
+                t.HasCheckConstraint("ck_execution_event_action", "action IN ('EXECUTION_STARTED','EXECUTION_TASK_ASSIGNED','EXECUTION_TASK_CHANGED','STEP_APPROVAL_REQUESTED','STEP_APPROVAL_APPROVED','STEP_APPROVAL_REJECTED','SKIP_AUTHORIZATION_REQUESTED','SKIP_AUTHORIZATION_APPROVED','SKIP_AUTHORIZATION_REJECTED','DEPENDENCY_EXCEPTION_REQUESTED','DEPENDENCY_EXCEPTION_APPROVED','DEPENDENCY_EXCEPTION_REJECTED','DEPENDENCY_EXCEPTION_REVOKED','EXECUTION_COMPLETED','EXECUTION_CANCELLED','SECURITY_CONTINUITY_AUTHORIZED','SECURITY_EXECUTION_CANCELLED')");
                 t.HasCheckConstraint("ck_execution_event_values", "revision > 0 AND incident_revision > 0 AND btrim(reason)<>'' AND execution_status IN ('IN_PROGRESS','COMPLETED','CANCELLED')");
-                t.HasCheckConstraint("ck_execution_event_task", "(task_id IS NULL AND task_status IS NULL AND assigned_membership_id IS NULL AND action IN ('EXECUTION_STARTED','EXECUTION_COMPLETED','EXECUTION_CANCELLED')) OR (task_id IS NOT NULL AND task_status IS NOT NULL AND task_status IN ('PENDING','IN_PROGRESS','BLOCKED','COMPLETED') AND action IN ('EXECUTION_TASK_ASSIGNED','EXECUTION_TASK_CHANGED','STEP_APPROVAL_REQUESTED','STEP_APPROVAL_APPROVED','STEP_APPROVAL_REJECTED'))");
+                t.HasCheckConstraint("ck_execution_event_task", "(task_id IS NULL AND task_status IS NULL AND assigned_membership_id IS NULL AND action IN ('EXECUTION_STARTED','EXECUTION_COMPLETED','EXECUTION_CANCELLED','SECURITY_CONTINUITY_AUTHORIZED','SECURITY_EXECUTION_CANCELLED')) OR (task_id IS NOT NULL AND task_status IS NOT NULL AND task_status IN ('PENDING','IN_PROGRESS','BLOCKED','COMPLETED','SKIPPED') AND action IN ('EXECUTION_TASK_ASSIGNED','EXECUTION_TASK_CHANGED','STEP_APPROVAL_REQUESTED','STEP_APPROVAL_APPROVED','STEP_APPROVAL_REJECTED','SKIP_AUTHORIZATION_REQUESTED','SKIP_AUTHORIZATION_APPROVED','SKIP_AUTHORIZATION_REJECTED','DEPENDENCY_EXCEPTION_REQUESTED','DEPENDENCY_EXCEPTION_APPROVED','DEPENDENCY_EXCEPTION_REJECTED','DEPENDENCY_EXCEPTION_REVOKED'))");
             });
             b.HasKey(e => e.Id); b.Property(e => e.Id).ValueGeneratedNever();
             b.Property(e => e.Action).HasMaxLength(40); b.Property(e => e.Reason).HasMaxLength(2000);

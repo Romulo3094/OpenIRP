@@ -17,18 +17,23 @@ public sealed partial class IdentityAdministrationTests
     private Task<IncidentItem> MoveWorkflow(Guid actor, Guid org, IncidentItem current, IncidentState target, string? resolution=null) =>
         Incidents(s=>s.TransitionAsync(actor,org,current.Id,new(target,resolution,"Transición justificada",current.Revision)));
 
-    private async Task<IncidentItem> ResolvedForClosure(Guid actor,Guid org,Guid membership,bool high=true,IncidentItem? existing=null)
+    private async Task<IncidentItem> ResolvedForClosure(Guid actor,Guid org,Guid membership,bool high=true,IncidentItem? existing=null,bool reviewed=true)
     {
         var current=existing??await RegisterIncident(actor,org);
         current=await CompleteSeverityInputs(actor,org,current,high?ImpactLevel.High:ImpactLevel.None,high?IncidentCriticality.High:IncidentCriticality.Low);
         current=await Incidents(s=>s.AssignAsync(actor,org,current.Id,new(membership,"Asignación",current.Revision)));
         current=await MoveWorkflow(actor,org,current,IncidentState.UnderEvaluation);
         current=await MoveWorkflow(actor,org,current,IncidentState.InResponse);
-        return await MoveWorkflow(actor,org,current,IncidentState.Resolved,"Resolución privada con evidencia");
+        current = await MoveWorkflow(actor,org,current,IncidentState.Resolved,"Resolución privada con evidencia");
+        return reviewed ? await AcceptRiskForTest(actor, org, current) : current;
     }
 
-    private Task<IncidentItem> AskClosure(Guid actor,Guid org,IncidentItem current) =>
-        Incidents(s=>s.RequestClosureAsync(actor,org,current.Id,new("Solicitar revisión de cierre",current.Revision)));
+    private async Task<IncidentItem> AskClosure(Guid actor,Guid org,IncidentItem current)
+    {
+        var state = await ClosureRead(actor, org, current.Id);
+        if (!state.RiskReview.AcceptanceCurrent) current = await AcceptRiskForTest(actor, org, current);
+        return await Incidents(s=>s.RequestClosureAsync(actor,org,current.Id,new("Solicitar revisión de cierre",current.Revision)));
+    }
     private Task<IncidentItem> ReviewClosure(Guid actor,Guid org,IncidentItem current,bool approve=true,bool self=false,string? justification=null) =>
         Incidents(s=>s.DecideClosureAsync(actor,org,current.Id,current.ClosureReview!.Id,new(approve,self,justification,"Decisión de cierre privada",current.Revision)));
 
@@ -39,6 +44,8 @@ public sealed partial class IdentityAdministrationTests
         Assert.Equal("RESOLVED",current.Status);Assert.Equal(IncidentSeverity.Low,current.MaximumSeverityReached);
         await Act(s=>s.AddMemberAsync(seed.Admin,seed.Org.Id,new(seed.Platform,OrganizationRole.OrgAdmin)));
         await Rejected(409,()=>MoveWorkflow(seed.Platform,seed.Org.Id,current,IncidentState.Closed));
+        Assert.False((await ClosureRead(seed.Admin,seed.Org.Id,current.Id)).RiskReview.AcceptanceCurrent);
+        current=await AcceptRiskForTest(seed.Admin,seed.Org.Id,current);
         var closed=await MoveWorkflow(seed.Admin,seed.Org.Id,current,IncidentState.Closed);
         Assert.Equal("CLOSED",closed.Status);Assert.NotNull(closed.Resolution);Assert.Null(closed.ClosureReview);
         var history=(await Incidents(s=>s.EventsAsync(seed.Admin,seed.Org.Id,current.Id))).Items;

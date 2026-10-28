@@ -12,7 +12,7 @@ internal static class EvidenceMapping
         {
             b.ToTable("incident_evidence", "app", t =>
             {
-                t.HasCheckConstraint("ck_evidence_content", "kind IN ('TEXT','REFERENCE','FILE') AND classification IN ('INTERNAL','CONFIDENTIAL') AND btrim(title)<>'' AND btrim(content)<>'' AND (kind<>'REFERENCE' OR (length(content)<=2048 AND content ~ '^https://'))");
+                t.HasCheckConstraint("ck_evidence_content", "kind IN ('TEXT','REFERENCE','FILE') AND classification IN ('INTERNAL','CONFIDENTIAL','RESTRICTED') AND btrim(title)<>'' AND btrim(content)<>'' AND (kind<>'REFERENCE' OR (length(content)<=2048 AND content ~ '^https://'))");
                 t.HasCheckConstraint("ck_evidence_task_scope", "(version_id IS NULL AND execution_id IS NULL AND task_id IS NULL) OR (version_id IS NOT NULL AND execution_id IS NOT NULL AND task_id IS NOT NULL)");
                 t.HasCheckConstraint("ck_evidence_lifecycle", "(status='ACTIVE' AND revision=1 AND withdrawn_by_user_id IS NULL AND withdrawn_at IS NULL AND withdrawal_reason IS NULL) OR (status='WITHDRAWN' AND revision=2 AND withdrawn_by_user_id IS NOT NULL AND withdrawn_at IS NOT NULL AND withdrawn_at>=created_at AND withdrawal_reason IS NOT NULL AND btrim(withdrawal_reason)<>'')");
             });
