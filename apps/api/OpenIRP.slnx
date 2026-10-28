@@ -3,4 +3,5 @@
   <Project Path="OpenIRP.Application/OpenIRP.Application.csproj" />
   <Project Path="OpenIRP.Domain/OpenIRP.Domain.csproj" />
   <Project Path="OpenIRP.Infrastructure/OpenIRP.Infrastructure.csproj" />
+  <Project Path="OpenIRP.IntegrationTests/OpenIRP.IntegrationTests.csproj" />
 </Solution>
